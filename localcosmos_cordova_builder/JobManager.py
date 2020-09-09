@@ -8,14 +8,14 @@ import datetime, json, os, logging, platform, shutil, zipfile, sys, pathlib
 from urllib.parse import urlencode, quote_plus, urljoin
 from urllib import request
 
-from CordovaAppBuilder import CordovaAppBuilder
+from .CordovaAppBuilder import CordovaAppBuilder
 
 from localcosmos_appkit_utils.MetaAppDefinition import MetaAppDefinition
 from localcosmos_appkit_utils.logger import get_logger
 
 from peewee import *
 
-from urllib_request_upload_files import MultiPartForm
+from .urllib_request_upload_files import MultiPartForm
 
 
 ##################################################################################################################
@@ -24,6 +24,11 @@ from urllib_request_upload_files import MultiPartForm
 ##################################################################################################################
 
 this_computer = platform.node()
+
+job_db_folder = os.getenv('LOCALCOSMOS_APPKITJOB_DB_DIR')
+db_path = os.path.join(job_db_folder, 'localcosmos.db')
+db = SqliteDatabase(db_path)
+
 
 JOB_STATUS = (
     'waiting_for_assignment', 'assigned', 'in_progress', 'success', 'failed',
@@ -68,6 +73,9 @@ class AppKitJob(Model):
         )
 
 
+db.connect()
+db.create_tables([AppKitJob])
+db.close()
 
 ##################################################################################################################
 # JOBMANAGER
@@ -84,12 +92,6 @@ class InvalidJobTypeError(Exception):
 class JobManager:
     
     def __init__(self, workdir):
-
-        db_path = os.path.join(workdir, 'localcosmos.db')
-        self.db = SqliteDatabase(db_path)
-
-        self.db.connect()
-        self.db.create_tables([AppKitJob])
 
         self.workdir = workdir
 
@@ -115,6 +117,8 @@ class JobManager:
     
     # update joblist an run jobs
     def update_joblist(self):
+
+        db.connect()
 
         self.logger.info('updating job list')
 
@@ -171,10 +175,15 @@ class JobManager:
 
                     db_job.assignment_reported_at = datetime.datetime.now()
                     db_job.save()
+                    
+
+        db.close()
 
 
 
     def run_jobs(self, rerun_unsuccessful=False, from_scratch=False):
+
+        db.connect()
 
         if rerun_unsuccessful == True:
             unfinished_jobs = AppKitJob.select().where((AppKitJob.finished_at==None) | (AppKitJob.job_status=='failed'))
@@ -217,6 +226,8 @@ class JobManager:
             job.save()
             
             self.logger.info('finished job {0} with success=={1}'.format(str(job.uuid), str(success)))
+
+        db.close()
 
             
     def run_build_job(self, job, from_scratch=False):
@@ -298,6 +309,8 @@ class JobManager:
     # report job results back to main localcosmos server
     def report_job_results(self):
 
+        db.connect()
+
         # jobs with no report sent yet
         unreported_finished_jobs = AppKitJob.select().where((AppKitJob.finished_at.is_null(False)) &
                                                             (AppKitJob.result_reported_at.is_null(True)))
@@ -312,6 +325,9 @@ class JobManager:
 
         for job in unreported_reran_jobs:
             self._report_job_result(job)
+
+
+        db.close()
             
             
     def report_build_result(self, job):
@@ -546,8 +562,8 @@ class JobAssignRequest(LCAppkitApiRequest):
     method = 'PATCH'
     path = 'jobs/'
 
-    def __init__(self, api_settings, job_id, data=None):
-        super().__init__(api_settings, data=data)
+    def __init__(self, workdir, api_settings, job_id, data=None):
+        super().__init__(workdir, api_settings, data=data)
         self.job_id = job_id
 
     def get_url(self):
@@ -562,8 +578,8 @@ class JobReportResultRequest(LCAppkitApiRequest):
     path = 'jobs/'
     content_type = 'multipart/form-data'
 
-    def __init__(self, api_settings, job_id, data=None, files={}):
-        super().__init__(api_settings, data=data, files=files)
+    def __init__(self, workdir, api_settings, job_id, data=None, files={}):
+        super().__init__(workdir, api_settings, data=data, files=files)
         self.job_id = job_id
 
     def get_headers(self, **kwargs):

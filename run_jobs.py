@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
     if error_log['error_count'] < 10 or force_run == True:
 
-        job_manager = JobManager()
+        job_manager = JobManager(workdir)
 
         run = True
 

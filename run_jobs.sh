@@ -3,7 +3,7 @@
 ##########################################################################################
 #
 # USAGE
-#	bash run_jobs.sh --python-env=/path/to/venv
+#	bash run_jobs.sh --python-venv /path/to/venv --workdir /path/to/workdir
 ##########################################################################################
 
 # required are PYTHON_ENV
@@ -11,6 +11,7 @@ optspec=":cfim-:"
 while getopts "$optspec" optchar; do
   case "${optchar}" in
     -)
+      echo "opting: ${OPTARG}"
       case "${OPTARG}" in
         python-venv)
           val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
