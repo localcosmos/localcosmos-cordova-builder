@@ -1,6 +1,10 @@
 import os, shutil
 import pathlib
 
+WORKDIR = os.getenv('LOCALCOSMOS_CORDOVA_BUILDER_WORKDIR', None)
+if not WORKDIR:
+    raise ValueError('LOCALCOSMOS_CORDOVA_BUILDER_WORKDIR environment variable not found')
+
 CORDOVA_CLI_VERSION = '10.0.0'
 
 CORDOVA_PLUGIN_VERSIONS = {
@@ -65,18 +69,16 @@ class CordovaAppBuilder:
     # has to be independant from django model instances and app builder instances, as it also runs on a mac
     # app_root_folder: absolute path to the folder in which the cordova app is created
     # common_www_folder:
-    def __init__(self, workdir, meta_app_definition, app_root_folder, common_www_folder):
-
-        self.workdir = workdir
+    def __init__(self, meta_app_definition, app_root_folder, common_www_folder):
 
         # LOGGING
         self.logger = self._get_logger(meta_app_definition.uuid)
 
         # setup cordova
-        cordova_manager = CordovaManager(workdir)
+        cordova_manager = CordovaManager()
         cordova_is_installed = cordova_manager.cordova_is_installed()
         if not cordova_is_installed:
-            self.logger.info('Installing cordova@{0} in {1}'.format(CORDOVA_CLI_VERSION, self.workdir))
+            self.logger.info('Installing cordova@{0} in {1}'.format(CORDOVA_CLI_VERSION, WORKDIR))
             cordova_manager.install_cordova()
 
         self.cordova_bin = cordova_manager.cordova_bin
@@ -113,7 +115,7 @@ class CordovaAppBuilder:
 
     def _get_logger(self, meta_app_uuid):
         
-        logging_folder = os.path.join(self.workdir, 'log/cordova_app_builder/')
+        logging_folder = os.path.join(WORKDIR, 'log/cordova_app_builder/')
         logger = get_logger(__name__, logging_folder, meta_app_uuid)
 
         return logger
@@ -370,7 +372,7 @@ class CordovaAppBuilder:
     # BUILD CONFIG
     ##############################################################################################################
     def _get_build_config_path(self):
-        return os.path.join(self.workdir, 'build_config.json')
+        return os.path.join(WORKDIR, 'build_config.json')
 
             
     ##############################################################################################################
@@ -769,17 +771,16 @@ class CordovaAppBuilder:
 # install a non-global (local) copy of apache cordova
 class CordovaManager:
 
-    def __init__(self, workdir):
+    def __init__(self):
 
-        self.workdir = workdir
-        if not os.path.isdir(workdir):
-            os.makedirs(workdir)
+        if not os.path.isdir(WORKDIR):
+            os.makedirs(WORKDIR)
 
         self.check_npm()
 
     @property
     def cordova_bin(self):
-        cordova_bin_path = os.path.join(self.workdir, 'node_modules/cordova/bin/cordova')
+        cordova_bin_path = os.path.join(WORKDIR, 'node_modules/cordova/bin/cordova')
         return cordova_bin_path
 
 
@@ -787,7 +788,7 @@ class CordovaManager:
 
         npm_command = ['npm', '--version', '--']
 
-        npm_command_result = subprocess.run(npm_command, stdout=PIPE, stderr=PIPE, cwd=self.workdir)
+        npm_command_result = subprocess.run(npm_command, stdout=PIPE, stderr=PIPE, cwd=WORKDIR)
         if npm_command_result.returncode != 0:
             raise CordovaBuildError(npm_command_result.stderr)
 
@@ -805,7 +806,7 @@ class CordovaManager:
         cordova_install_command = ['npm', 'install', 'cordova@{0}'.format(CORDOVA_CLI_VERSION)]
 
         cordova_install_command_result = subprocess.run(cordova_install_command, stdout=PIPE, stderr=PIPE,
-                                                        cwd=self.workdir)
+                                                        cwd=WORKDIR)
 
 
         if cordova_install_command_result.returncode != 0:

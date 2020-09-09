@@ -25,8 +25,11 @@ from .urllib_request_upload_files import MultiPartForm
 
 this_computer = platform.node()
 
-job_db_folder = os.getenv('LOCALCOSMOS_APPKITJOB_DB_DIR')
-db_path = os.path.join(job_db_folder, 'localcosmos.db')
+WORKDIR = os.getenv('LOCALCOSMOS_CORDOVA_BUILDER_WORKDIR')
+if not WORKDIR:
+    raise ValueError('LOCALCOSMOS_CORDOVA_BUILDER_WORKDIR environment variable not found')
+
+db_path = os.path.join(WORKDIR, 'localcosmos.db')
 db = SqliteDatabase(db_path)
 
 
@@ -91,11 +94,9 @@ class InvalidJobTypeError(Exception):
 
 class JobManager:
     
-    def __init__(self, workdir):
+    def __init__(self):
 
-        self.workdir = workdir
-
-        api_settings_filepath = os.path.join(workdir, 'jobmanager_settings.json')
+        api_settings_filepath = os.path.join(WORKDIR, 'jobmanager_settings.json')
 
         with open(api_settings_filepath, 'r') as settings_file:
             self.settings = json.loads(settings_file.read())
@@ -107,7 +108,7 @@ class JobManager:
 
         logger = logging.getLogger(__name__)
         # for cross platform logging use a logfolder within the folder in which JobManager.py lies
-        logging_folder = os.path.join(self.workdir, 'log/job_manager/')
+        logging_folder = os.path.join(WORKDIR, 'log/job_manager/')
 
         smtp_logger = self.settings['email']
         logger = get_logger(__name__, logging_folder, 'log', smtp_logger=smtp_logger)
@@ -126,7 +127,7 @@ class JobManager:
             'platform' : self.settings['platform'],
         }
 
-        request = JobListRequest(self.workdir, self.settings, data=data)
+        request = JobListRequest(self.settings, data=data)
         
         response = request.execute()
         
@@ -169,7 +170,7 @@ class JobManager:
                         'status' : 'assigned',
                     }
 
-                    assign_request = JobAssignRequest(self.workdir, self.settings, db_job.lc_id,
+                    assign_request = JobAssignRequest(self.settings, db_job.lc_id,
                                                       data=assignment_data)
                     assign_request.execute()
 
@@ -265,7 +266,7 @@ class JobManager:
         # the folder where to create apps
         app_root_folder = self._app_root_folder(meta_app_definition, job.app_version)
 
-        cordova_app_builder = CordovaAppBuilder(self.workdir, meta_app_definition, app_root_folder,
+        cordova_app_builder = CordovaAppBuilder(meta_app_definition, app_root_folder,
                                                 common_www_folder)
 
         cordova_app_builder.build_ios(rebuild=from_scratch)
@@ -352,7 +353,7 @@ class JobManager:
                 }
             }
 
-        request = JobReportResultRequest(self.workdir, self.settings, job.lc_id, data=data, files=files)
+        request = JobReportResultRequest(self.settings, job.lc_id, data=data, files=files)
     
         response = request.execute()
 
@@ -367,7 +368,7 @@ class JobManager:
             'job_result' : job.job_result,
         }
 
-        request = JobReportResultRequest(self.workdir, self.settings, job.lc_id, data=data)
+        request = JobReportResultRequest(self.settings, job.lc_id, data=data)
     
         response = request.execute()
 
@@ -393,22 +394,20 @@ class LCAppkitApiRequest:
     content_type = 'application/x-www-form-urlencoded'
 
 
-    def __init__(self, workdir, api_settings, data=None, files={}):
-
-        self.workdir = workdir
+    def __init__(self,api_settings, data=None, files={}):
         
         self.domain = api_settings['api_url']
         self.settings = api_settings
         self.data = data
         self.files = files
 
-        self.token_store_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'token.json')
+        self.token_store_path = os.path.join(WORKDIR, 'token.json')
 
 
     def _get_logger(self):
         
         # for cross platform logging use a logfolder within the folder in which JobManager.py lies
-        logging_folder = os.path.join(self.workdir, 'log/job_api/')
+        logging_folder = os.path.join(WORKDIR, 'log/job_api/')
 
         logger = get_logger(__name__, logging_folder, 'log')
 
@@ -451,7 +450,7 @@ class LCAppkitApiRequest:
                 'password' : self.settings['auth']['password'],
             }
 
-            request = AuthTokenRequest(self.workdir, self.settings, data=data)
+            request = AuthTokenRequest(self.settings, data=data)
 
             response = request.execute()
 
@@ -562,8 +561,8 @@ class JobAssignRequest(LCAppkitApiRequest):
     method = 'PATCH'
     path = 'jobs/'
 
-    def __init__(self, workdir, api_settings, job_id, data=None):
-        super().__init__(workdir, api_settings, data=data)
+    def __init__(self, api_settings, job_id, data=None):
+        super().__init__(api_settings, data=data)
         self.job_id = job_id
 
     def get_url(self):
@@ -578,8 +577,8 @@ class JobReportResultRequest(LCAppkitApiRequest):
     path = 'jobs/'
     content_type = 'multipart/form-data'
 
-    def __init__(self, workdir, api_settings, job_id, data=None, files={}):
-        super().__init__(workdir, api_settings, data=data, files=files)
+    def __init__(self, api_settings, job_id, data=None, files={}):
+        super().__init__(api_settings, data=data, files=files)
         self.job_id = job_id
 
     def get_headers(self, **kwargs):
