@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>org.localcosmos.jobmanager</string>
+	<key>Program</key>
+	<string>/path/to/script/run_jobs.sh --python-venv=/path/to/venv</string>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StartInterval</key>
+	<integer>60</integer>
+	<key>StandardErrorPath</key>
+	<string>/path/to/script/org.localcosmos.jobmanager.err</string>
+	<key>StandardOutPath</key>
+	<string>/path/to/script/org.localcosmos.jobmanager.out</string>
+</dict>
+</plist>

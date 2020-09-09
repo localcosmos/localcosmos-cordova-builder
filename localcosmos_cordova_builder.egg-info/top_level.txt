@@ -1,0 +1,1 @@
+localcosmos_cordova_builder

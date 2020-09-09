@@ -1,0 +1,5 @@
+localcosmos_appkit_utils
+peewee>=3.9.6
+pillow>=6.1.0
+lxml>=4.3.4
+tendo
