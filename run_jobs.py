@@ -5,7 +5,7 @@
 # this script is intended for CRONJOBS
 #
 # USAGE:
-#  python3 run_jobs.py --workdir=/path/to/workdir --force-run --rerun-unsuccessful
+#  python3 run_jobs.py --force-run --rerun-unsuccessful
 #  the workdir must contain jobmanager_settings.json and build_config.json
 #  logs will be saved in workdir/logs
 ##############################################################################################################
@@ -17,17 +17,19 @@ import os, json, sys, pathlib, getopt
 
 from datetime import datetime
 
+WORKDIR = os.environ.get('LOCALCOSMOS_CORDOVA_BUILDER_WORKDIR', None)
+if not WORKDIR:
+    raise ValueError('WORKDIR environment variable not set')
+
 ERROR_RETRY_TIMEOUT_MINUTES = 5
 short_options = []
-long_options = ['workdir=','force-run','rerun-unsuccessful']
+long_options = ['force-run','rerun-unsuccessful']
 
 
 if __name__ == "__main__":
 
     me = SingleInstance()
 
-    # fetched using --workdir=
-    workdir = None
     force_run = False
     rerun_unsuccessful = False
 
@@ -45,19 +47,11 @@ if __name__ == "__main__":
 
     for argument, value in arguments:
 
-        if argument == '--workdir':
-            workdir = value
-
-        elif argument == '--force-run':
+        if argument == '--force-run':
             force_run = True
 
         elif argument == '--rerun-unsuccessful':
             rerun_unsuccessful = True
-
-    if workdir == None:
-        print ('Workdir not set. Use --workdir=/path/to/workdir. Aborting.')
-        sys.exit(2)
-
 
     if force_run == True:
         print('forcing the run')
@@ -66,8 +60,7 @@ if __name__ == "__main__":
         print('rerunning previously unsuccessful jobs')
 
 
-    root = pathlib.Path(workdir)
-    error_count_path = os.path.join(root, 'error_count.json')
+    error_count_path = os.path.join(WORKDIR, 'error_count.json')
 
     error_log = {
         'error_count' : 0,
@@ -80,7 +73,7 @@ if __name__ == "__main__":
 
     if error_log['error_count'] < 10 or force_run == True:
 
-        job_manager = JobManager(workdir)
+        job_manager = JobManager()
 
         run = True
 

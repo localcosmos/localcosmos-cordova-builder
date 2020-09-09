@@ -1,0 +1,26 @@
+{
+	"ios" : {
+		"debug" : {
+			"codeSignIdentity": "iPhone Developer",
+            "developmentTeam": "YOURTEAMID",
+            "packageType": "development"
+		},
+		"release" : {
+			"codeSignIdentity": "iPhone Developer",
+            "developmentTeam": "YOURTEAMID",
+            "packageType": "app-store",
+            "automaticProvisioning" : true
+		}
+	},
+    "android" : {
+        "debug" : {
+            
+        },
+        "release" : {
+            "keyStore" : "",
+            "storePassword" : "",
+            "alias" : "localcosmos",
+            "password" : ""
+        }
+    }
+}

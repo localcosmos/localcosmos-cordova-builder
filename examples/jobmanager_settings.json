@@ -1,0 +1,21 @@
+{
+	"localcosmos_server_url" : "https://myserver.org/",
+	"api_url" : "https://myserver.org/api/building/",
+	"platform" : "ios",
+	"apps_root_folder" : "/path/to/apps",
+	"jobs_temp_folder" : "/path/to/tmp",
+	"auth" : {
+		"username" : "APIUSER",
+		"password" : "SECUREPASSWORD"
+	},
+    "email" : {
+        "host" : "https://smtp.myserver.org",
+        "port" : 587,
+        "from" : "info@myserver.org",
+        "to" : "service@myserver.org",
+        "credentials" : {
+            "username" : "service@myserver.org",
+            "password" : "EMAILACCOUNTPASSWORD"
+        }
+    }
+}
