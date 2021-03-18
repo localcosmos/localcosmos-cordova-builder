@@ -8,28 +8,27 @@ if not WORKDIR:
 CORDOVA_CLI_VERSION = '10.0.0'
 
 CORDOVA_PLUGIN_VERSIONS = {
+    "cordova-plugin-camera" : "cordova-plugin-camera@5.1.0",
     "cordova-plugin-console" : "cordova-plugin-console@1.1.0",
     "cordova-plugin-datepicker" : "cordova-plugin-datepicker@0.9.3",
     "cordova-plugin-device": "cordova-plugin-device@2.0.3",
     "cordova-plugin-dialogs" : "cordova-plugin-dialogs@2.0.2",
     "cordova-plugin-file" : "cordova-plugin-file@6.0.2",
-    # "cordova-plugin-inappbrowser" : "cordova-plugin-inappbrowser@4.0.0",
+    "cordova-plugin-geolocation" : "cordova-plugin-geolocation@4.1.0",
     "cordova-plugin-network-information" : "cordova-plugin-network-information@2.0.2",
-    "cordova-plugin-splashscreen" : "cordova-plugin-splashscreen@5.0.4",
-    "cordova-sqlite-storage" : "cordova-sqlite-storage@5.0.0",
+    "cordova-plugin-splashscreen" : "cordova-plugin-splashscreen@6.0.0",
     "cordova-plugin-statusbar" : "cordova-plugin-statusbar@2.4.3",
+    "cordova-plugin-whitlest" : "cordova-plugin-whitelist@1.3.4",
+    "cordova-sqlite-storage" : "cordova-sqlite-storage@5.1.0",
 
-    "cordova-plugin-geolocation" : "cordova-plugin-geolocation@4.0.2",
-    "cordova-plugin-camera" : "cordova-plugin-camera@4.1.0",
-
-    "cordova-plugin-wkwebview-engine" : "cordova-plugin-wkwebview-engine@1.2.1 ",
-    "cordova-plugin-wkwebview-file-xhr" : "cordova-plugin-wkwebview-file-xhr@2.1.4",
+    #"cordova-plugin-wkwebview-engine" : "cordova-plugin-wkwebview-engine@1.2.1 ",
+    "cordova-plugin-wkwebview-file-xhr" : "cordova-plugin-wkwebview-file-xhr@3.0.0",
     
 }
 
 CORDOVA_PLATFORM_VERSIONS = {
     "android" : "android@9.0.0",
-    "ios" : "ios@5.1.1",
+    "ios" : "ios@6.2.0",
 }
 
 class CordovaBuildError(Exception):
@@ -60,10 +59,10 @@ class CordovaAppBuilder:
     default_plugins = ['cordova-plugin-device', 'cordova-plugin-network-information', 'cordova-plugin-file',
                        'cordova-plugin-dialogs', 'cordova-plugin-splashscreen', 'cordova-plugin-console',
                        'cordova-sqlite-storage', 'cordova-plugin-datepicker', 'cordova-plugin-statusbar',
-                       'cordova-plugin-camera', 'cordova-plugin-geolocation']
+                       'cordova-plugin-camera', 'cordova-plugin-geolocation', 'cordova-plugin-whitelist']
 
-    # this will probably become obsolete with cordova ios 6.x
-    ios_plugins = ['cordova-plugin-wkwebview-engine', 'cordova-plugin-wkwebview-file-xhr']
+    # this might be obsolte in cordova-ios@6.2.0
+    ios_plugins = ['cordova-plugin-wkwebview-file-xhr']
 
 
     # has to be independant from django model instances and app builder instances, as it also runs on a mac

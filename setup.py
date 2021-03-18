@@ -13,7 +13,7 @@ install_requires = [
 
 setup(
     name='localcosmos_cordova_builder',
-    version='0.2',
+    version='0.3',
     description='Create android and ios app packages for Local Cosmos apps.',
     long_description=long_description,
     long_description_content_type='text/markdown',
