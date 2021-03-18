@@ -8,7 +8,7 @@ if not WORKDIR:
 CORDOVA_CLI_VERSION = '10.0.0'
 
 CORDOVA_PLUGIN_VERSIONS = {
-    "cordova-plugin-camera" : "cordova-plugin-camera@5.1.0",
+    "cordova-plugin-camera" : "cordova-plugin-camera@5.0.1",
     "cordova-plugin-console" : "cordova-plugin-console@1.1.0",
     "cordova-plugin-datepicker" : "cordova-plugin-datepicker@0.9.3",
     "cordova-plugin-device": "cordova-plugin-device@2.0.3",
@@ -18,7 +18,7 @@ CORDOVA_PLUGIN_VERSIONS = {
     "cordova-plugin-network-information" : "cordova-plugin-network-information@2.0.2",
     "cordova-plugin-splashscreen" : "cordova-plugin-splashscreen@6.0.0",
     "cordova-plugin-statusbar" : "cordova-plugin-statusbar@2.4.3",
-    "cordova-plugin-whitlest" : "cordova-plugin-whitelist@1.3.4",
+    "cordova-plugin-whitelist" : "cordova-plugin-whitelist@1.3.4",
     "cordova-sqlite-storage" : "cordova-sqlite-storage@5.1.0",
 
     #"cordova-plugin-wkwebview-engine" : "cordova-plugin-wkwebview-engine@1.2.1 ",

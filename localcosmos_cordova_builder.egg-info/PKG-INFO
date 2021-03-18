@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: localcosmos-cordova-builder
-Version: 0.3
+Version: 0.3.2
 Summary: Create android and ios app packages for Local Cosmos apps.
 Home-page: https://github.com/SiSol-Systems/localcosmos-cordova-builder
 Author: Thomas Uher
