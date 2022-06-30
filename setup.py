@@ -4,7 +4,6 @@ with open('README.md', 'r') as fh:
     long_description = fh.read()
 
 install_requires = [
-    'localcosmos-appkit-utils',
     'peewee>=3.9.6',
     'lxml>=4.3.4',
     'tendo',
@@ -13,7 +12,7 @@ install_requires = [
 
 setup(
     name='localcosmos_cordova_builder',
-    version='0.3.2',
+    version='0.4.0',
     description='Create android and ios app packages for Local Cosmos apps.',
     long_description=long_description,
     long_description_content_type='text/markdown',

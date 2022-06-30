@@ -1,8 +1,12 @@
+LICENSE
 README.md
 setup.py
+localcosmos_cordova_builder/AppImageCreator.py
 localcosmos_cordova_builder/CordovaAppBuilder.py
 localcosmos_cordova_builder/JobManager.py
+localcosmos_cordova_builder/MetaAppDefinition.py
 localcosmos_cordova_builder/__init__.py
+localcosmos_cordova_builder/image_utils.py
 localcosmos_cordova_builder/urllib_request_upload_files.py
 localcosmos_cordova_builder.egg-info/PKG-INFO
 localcosmos_cordova_builder.egg-info/SOURCES.txt

@@ -1,4 +1,3 @@
-localcosmos-appkit-utils
 peewee>=3.9.6
 lxml>=4.3.4
 tendo

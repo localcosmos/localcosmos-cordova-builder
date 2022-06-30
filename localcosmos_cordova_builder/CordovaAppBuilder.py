@@ -1,33 +1,31 @@
-import os, shutil
-import pathlib
+import os, shutil, logging
+from logging.handlers import SMTPHandler
 
+# WORKDIR is the directory where node_modules and the cordova binary are installed
 WORKDIR = os.getenv('LOCALCOSMOS_CORDOVA_BUILDER_WORKDIR', None)
 if not WORKDIR:
     raise ValueError('LOCALCOSMOS_CORDOVA_BUILDER_WORKDIR environment variable not found')
 
-CORDOVA_CLI_VERSION = '10.0.0'
+CORDOVA_CLI_VERSION = '11.0.0'
 
 CORDOVA_PLUGIN_VERSIONS = {
-    "cordova-plugin-camera" : "cordova-plugin-camera@5.0.1",
-    "cordova-plugin-console" : "cordova-plugin-console@1.1.0",
+    "cordova-plugin-camera" : "cordova-plugin-camera@6.0.0",
     "cordova-plugin-datepicker" : "cordova-plugin-datepicker@0.9.3",
     "cordova-plugin-device": "cordova-plugin-device@2.0.3",
     "cordova-plugin-dialogs" : "cordova-plugin-dialogs@2.0.2",
     "cordova-plugin-file" : "cordova-plugin-file@6.0.2",
     "cordova-plugin-geolocation" : "cordova-plugin-geolocation@4.1.0",
-    "cordova-plugin-network-information" : "cordova-plugin-network-information@2.0.2",
+    "cordova-plugin-network-information" : "cordova-plugin-network-information@3.0.0",
     "cordova-plugin-splashscreen" : "cordova-plugin-splashscreen@6.0.0",
-    "cordova-plugin-statusbar" : "cordova-plugin-statusbar@2.4.3",
-    "cordova-plugin-whitelist" : "cordova-plugin-whitelist@1.3.4",
-    "cordova-sqlite-storage" : "cordova-sqlite-storage@5.1.0",
+    "cordova-plugin-statusbar" : "cordova-plugin-statusbar@3.0.0",
+    "cordova-sqlite-storage" : "cordova-sqlite-storage@6.0.0",
 
-    #"cordova-plugin-wkwebview-engine" : "cordova-plugin-wkwebview-engine@1.2.1 ",
     "cordova-plugin-wkwebview-file-xhr" : "cordova-plugin-wkwebview-file-xhr@3.0.0",
     
 }
 
 CORDOVA_PLATFORM_VERSIONS = {
-    "android" : "android@9.0.0",
+    "android" : "android@10.1.2",
     "ios" : "ios@6.2.0",
 }
 
@@ -39,39 +37,123 @@ import subprocess, os, shutil, zipfile, logging
 from subprocess import CalledProcessError, PIPE
 
 
-from localcosmos_appkit_utils.AppImageCreator import AndroidAppImageCreator, IOSAppImageCreator
-from localcosmos_appkit_utils.AppTheme import AppTheme
-from localcosmos_appkit_utils.logger import get_logger
+from .AppImageCreator import AndroidAppImageCreator, IOSAppImageCreator
+
 
 from lxml import etree
 
 
 class CordovaAppBuilder:
 
-    # cordova creates apks n these folders
-    debug_apk_output_path = 'platforms/android/app/build/outputs/apk/debug/app-debug.apk'
-    unsigned_release_apk_output_path = 'platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk'
-    signed_release_apk_output_path = 'platforms/android/app/build/outputs/apk/release/app-release.apk'
-
-
-    relative_cordova_template_path = 'cordova_template'
+    # cordova creates aabs in these folders
+    unsigned_release_aab_output_path = 'platforms/android/app/build/outputs/bundle/release/app-release-unsigned.aab'
+    signed_release_aab_output_path = 'platforms/android/app/build/outputs/bundle/release/app-release.aab'
 
     default_plugins = ['cordova-plugin-device', 'cordova-plugin-network-information', 'cordova-plugin-file',
-                       'cordova-plugin-dialogs', 'cordova-plugin-splashscreen', 'cordova-plugin-console',
-                       'cordova-sqlite-storage', 'cordova-plugin-datepicker', 'cordova-plugin-statusbar',
-                       'cordova-plugin-camera', 'cordova-plugin-geolocation', 'cordova-plugin-whitelist']
+                       'cordova-plugin-dialogs', 'cordova-plugin-splashscreen', 'cordova-sqlite-storage',
+                       'cordova-plugin-datepicker', 'cordova-plugin-statusbar', 'cordova-plugin-camera',
+                       'cordova-plugin-geolocation']
 
-    # this might be obsolte in cordova-ios@6.2.0
+    # this might be obsolete in cordova-ios@6.2.0
     ios_plugins = ['cordova-plugin-wkwebview-file-xhr']
 
 
     # has to be independant from django model instances and app builder instances, as it also runs on a mac
-    # app_root_folder: absolute path to the folder in which the cordova app is created
-    # common_www_folder:
-    def __init__(self, meta_app_definition, app_root_folder, common_www_folder):
+    # _cordova_build_path: root folder where cordova projects are created, inside the versioned app folder 
+    # _app_packages_path: the path where to store the created app package
+    # _app_build_sources_path: a folder containing all files required for a successful build
+    def __init__(self, meta_app_definition, _cordova_build_path, _app_packages_path, _app_build_sources_path):
 
-        # LOGGING
-        self.logger = self._get_logger(meta_app_definition.uuid)
+        self.meta_app_definition = meta_app_definition
+
+        self.build_number = meta_app_definition.build_number
+
+        # path where cordova projects (apps) are build
+        self._cordova_build_path = _cordova_build_path
+        
+        # the folder in which the "cordova" folder is created
+        self._app_packages_path = _app_packages_path
+
+        # the www content of the app, without cordova.js
+        self._app_build_sources_path = _app_build_sources_path
+
+        #self._user_content_folder = os.path.join(common_www_folder, 'user_content', 'themes',
+        #                                         self.meta_app_definition.theme)
+
+        # theme
+        #app_theme_path = os.path.join(common_www_folder, 'themes', meta_app_definition.theme)
+        #self.app_theme = AppTheme(app_theme_path)
+
+    def _get_logger(self, smtp_logger={}):
+
+        if hasattr(self, 'logger'):
+            return self.logger
+
+        else:
+            logger = logging.getLogger(__name__)
+
+            logfile_name = self.meta_app_definition.uuid
+
+            logging_path = os.path.join(WORKDIR, 'log/cordova_app_builder/')
+
+            if not os.path.isdir(logging_path):
+                os.makedirs(logging_path)
+
+            logfile_path = os.path.join(logging_path, logfile_name)
+            formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+
+            # add FileHandler
+            file_hdlr = logging.FileHandler(logfile_path)
+            file_hdlr.setFormatter(formatter)
+            
+            logger.addHandler(file_hdlr)
+            logger.setLevel(logging.INFO)
+
+
+            # add smtp Handler
+            if smtp_logger:
+                smtp_hdlr = SMTPHandler((smtp_logger['host'], smtp_logger['port']), smtp_logger['from'], smtp_logger['to'],
+                                        'CordovaAppBuilder Error', credentials=smtp_logger['credentials'], secure=())
+
+                smtp_hdlr.setLevel(logging.ERROR)
+                logger.addHandler(smtp_hdlr)
+
+
+            return logger
+
+
+    @property
+    def _app_folder_name(self):
+        return self.meta_app_definition.package_name
+
+    @property
+    def _android_sources_root(self):
+        return os.path.join(self._app_build_sources_path, 'android')
+
+    @property
+    def _android_www_path(self):
+        return os.path.join(self._android_sources_root, 'www')
+
+    @property
+    def _ios_sources_root(self):
+        return os.path.join(self._app_build_sources_path, 'ios')
+
+    @property
+    def _ios_www_path(self):
+        return os.path.join(self._ios_sources_root, 'www')
+
+    @property
+    def _app_cordova_path(self):
+        return os.path.join(self._cordova_build_path, self._app_folder_name)
+
+    @property
+    def _cordova_www_path(self):
+        return os.path.join(self._app_cordova_path, 'www')
+
+
+    def load_cordova(self):
+
+        self.logger.info('Loading cordova environment')
 
         # setup cordova
         cordova_manager = CordovaManager()
@@ -81,43 +163,6 @@ class CordovaAppBuilder:
             cordova_manager.install_cordova()
 
         self.cordova_bin = cordova_manager.cordova_bin
-
-        self.app_version = meta_app_definition.app_version
-        self.build_number = meta_app_definition.build_number
-        self.meta_app_definition = meta_app_definition
-
-        # the folder in which the "cordova" folder is created
-        self._app_root_folder = app_root_folder
-        
-        self._app_folder_name = self.meta_app_definition.package_name
-
-        # the folder in which the cordova create command is executed
-        self._build_root_folder = os.path.join(self._app_root_folder, 'cordova')
-        if not os.path.isdir(self._build_root_folder):
-            os.makedirs(self._build_root_folder)
-
-        # the www content of the app, without cordova.js
-        self._common_www_folder = common_www_folder
-
-        self._user_content_folder = os.path.join(common_www_folder, 'user_content', 'themes',
-                                                 self.meta_app_definition.theme)
-
-        # the folder of the cordova project
-        self._app_cordova_folder = os.path.join(self._build_root_folder, self._app_folder_name)
-        # www folder inside cordova project
-        self._cordova_www_folder = os.path.join(self._app_cordova_folder, 'www')
-
-        # theme
-        app_theme_path = os.path.join(common_www_folder, 'themes', meta_app_definition.theme)
-        self.app_theme = AppTheme(app_theme_path)
-
-
-    def _get_logger(self, meta_app_uuid):
-        
-        logging_folder = os.path.join(WORKDIR, 'log/cordova_app_builder/')
-        logger = get_logger(__name__, logging_folder, meta_app_uuid)
-
-        return logger
 
 
     # delete and recreate a folder
@@ -147,7 +192,7 @@ class CordovaAppBuilder:
             commands.append([self.cordova_bin, 'plugin', 'add', CORDOVA_PLUGIN_VERSIONS[plugin]])
 
         for command in commands:
-            process_completed = subprocess.run(command, stdout=PIPE, stderr=PIPE, cwd=self._app_cordova_folder)
+            process_completed = subprocess.run(command, stdout=PIPE, stderr=PIPE, cwd=self._app_cordova_path)
 
             if process_completed.returncode != 0:
                 raise CordovaBuildError(process_completed.stderr)
@@ -163,7 +208,7 @@ class CordovaAppBuilder:
 
 
         for command in commands:
-            process_completed = subprocess.run(command, stdout=PIPE, stderr=PIPE, cwd=self._app_cordova_folder)
+            process_completed = subprocess.run(command, stdout=PIPE, stderr=PIPE, cwd=self._app_cordova_path)
 
             if process_completed.returncode != 0:
                 raise CordovaBuildError(process_completed.stderr)
@@ -172,10 +217,12 @@ class CordovaAppBuilder:
     def _build_blank_cordova_app(self, platform, rebuild=False):
 
         if rebuild == True:
-            shutil.rmtree(self._app_cordova_folder)
+            shutil.rmtree(self._cordova_build_path)
 
         # check for the cordova app
-        if not os.path.isdir(self._app_cordova_folder):
+        if not os.path.isdir(self._cordova_build_path):
+
+            os.makedirs(self._cordova_build_path)
 
             self.logger.info('Building initial blank cordova app')
             
@@ -188,7 +235,7 @@ class CordovaAppBuilder:
                               self.meta_app_definition.name]
 
             create_process_completed = subprocess.run(create_command, stdout=PIPE, stderr=PIPE,
-                                                      cwd=self._build_root_folder)
+                                                      cwd=self._cordova_build_path)
 
 
             if create_process_completed.returncode != 0:
@@ -220,31 +267,28 @@ class CordovaAppBuilder:
     # add WWW
     # determine if the www folder already is the apps one: check for www/settings and www/features.js
 
-    def _add_www_folder(self, rebuild=False):
+    def _add_www_folder (self, source_www_path, rebuild=False):
 
         self.logger.info('Adding app www if necessary')
 
         app_www_exists = True
 
-        check_files = ['settings.js', 'features.js']
+        check_files = ['settings.json']
 
         for filename in check_files:
 
-            filepath = os.path.join(self._cordova_www_folder, filename)
+            filepath = os.path.join(self._cordova_www_path, filename)
 
             if not os.path.isfile(filepath):
                 app_www_exists = False
                 break
 
         if app_www_exists == False or rebuild == True:
-            # add www contents as symlinks
-            # recreating the www folder will be obsolete when the LC cordova template will be used
-            #self.deletecreate_folder(self._cordova_www_folder)
             
-            shutil.rmtree(self._cordova_www_folder)
+            shutil.rmtree(self._cordova_www_path)
 
             # copy common www, cordova cannot work with symlinks
-            shutil.copytree(self._common_www_folder, self._cordova_www_folder)
+            shutil.copytree(source_www_path, self._cordova_www_path)
         
 
     ###########################################################################################
@@ -253,7 +297,7 @@ class CordovaAppBuilder:
     
     def _add_to_config_xml(self, tag_name, tag_attributes={}):
 
-        config_xml_path = os.path.join(self._app_cordova_folder, 'config.xml')
+        config_xml_path = os.path.join(self._app_cordova_path, 'config.xml')
 
         with open(config_xml_path, 'rb') as config_file:
             config_xml_tree = etree.parse(config_file)
@@ -303,7 +347,7 @@ class CordovaAppBuilder:
     # currently only major is supported
     def set_config_xml_app_version(self, app_version, build_number):
 
-        config_xml_path = os.path.join(self._app_cordova_folder, 'config.xml')
+        config_xml_path = os.path.join(self._app_cordova_path, 'config.xml')
 
         with open(config_xml_path, 'rb') as config_file:
             config_xml_tree = etree.parse(config_file)
@@ -328,7 +372,7 @@ class CordovaAppBuilder:
     ###########################################################################################
     def get_zip_filepath(self):
         filename = 'cordova_www.zip'
-        return os.path.join(self._build_root_folder, filename)
+        return os.path.join(self._cordova_build_path, filename)
     
     
     def create_zipfile(self):
@@ -375,7 +419,7 @@ class CordovaAppBuilder:
 
             
     ##############################################################################################################
-    # BUILD ANDROID APK
+    # BUILD ANDROID AAB
     # - create blank cordova app
     # - install plugins
     # - copy config.xml and other files
@@ -384,31 +428,35 @@ class CordovaAppBuilder:
     ##############################################################################################################
     def build_android(self, keystore_path, keystore_password, key_password, rebuild=False):
 
+        self.logger = self._get_logger()
+
         self.logger.info('Building cordova android app')
+
+        self.load_cordova()
 
         self._build_blank_cordova_app('Android', rebuild=rebuild)
 
         # set app version
-        self.set_config_xml_app_version(self.app_version, self.build_number)
+        self.set_config_xml_app_version(self.meta_app_definition.current_version, self.build_number)
 
         self.logger.info('Adding android platform')
         add_android_command = [self.cordova_bin, 'platform', 'add', CORDOVA_PLATFORM_VERSIONS['android']]
 
 
         add_android_completed_process = subprocess.run(add_android_command, stdout=PIPE, stderr=PIPE,
-                                                       cwd=self._app_cordova_folder)
+                                                       cwd=self._app_cordova_path)
 
         if add_android_completed_process.returncode != 0:
             raise CordovaBuildError(add_android_completed_process.stderr)
         
-        self._add_www_folder(rebuild=True)
+        self._add_www_folder(self._android_www_path, rebuild=True)
 
         # build android images
         self.logger.info('building Android launcher and splashscreen images')
-        image_creator = AndroidAppImageCreator(self.meta_app_definition, self._app_cordova_folder,
-                                               self._user_content_folder, self.app_theme)
+        image_creator = AndroidAppImageCreator(self.meta_app_definition, self._app_cordova_path,
+                                                self._app_build_sources_path)
         
-        image_creator.generate_images_from_svg('launcher')
+        image_creator.generate_images_from_svg('launcher_icon')
         image_creator.generate_images_from_svg('launcher_background')
         image_creator.generate_images_from_svg('splashscreen', varying_ratios=True)
 
@@ -419,21 +467,25 @@ class CordovaAppBuilder:
                                  '--alias=localcosmos', '--password={0}'.format(key_password)]
 
         build_android_process_completed = subprocess.run(build_android_command, stdout=PIPE, stderr=PIPE,
-                                                         cwd=self._app_cordova_folder)
+                                                         cwd=self._app_cordova_path)
 
         if build_android_process_completed.returncode != 0:
             raise CordovaBuildError(build_android_process_completed.stderr)
 
 
-        return self.get_apk_filepath()
+        return self._aab_filepath
 
 
-    def get_apk_filepath(self):
-        return os.path.join(self._app_cordova_folder, self.signed_release_apk_output_path)
+    @property
+    def _aab_filepath(self):
+        return os.path.join(self._app_cordova_path, self.signed_release_aab_output_path)
 
-    @classmethod
-    def get_apk_filename(cls, meta_app_definition):
-        filename = '{0}.apk'.format(meta_app_definition.package_name)
+    @property
+    def _aab_filename(self):
+        package_name = self.meta_app_definition.package_name
+        version = self.meta_app_definition.current_version
+        build_number = self.meta_app_definition.build_number
+        filename = '{0}-{1}-{2}.aab'.format(package_name, version, build_number)
         return filename
 
 
@@ -463,7 +515,7 @@ class CordovaAppBuilder:
 
 
     def get_ipa_folder(self):
-        return os.path.join(self._app_cordova_folder, 'platforms/ios/build/device/')
+        return os.path.join(self._app_cordova_path, 'platforms/ios/build/device/')
 
     def get_ipa_filepath(self):
         filename = self.get_ipa_filename(self.meta_app_definition)
@@ -471,7 +523,7 @@ class CordovaAppBuilder:
 
     # only set once, check if it already exists first
     def set_ios_info_plist_value(self, key, value):
-        config_xml_path = os.path.join(self._app_cordova_folder, 'config.xml')
+        config_xml_path = os.path.join(self._app_cordova_path, 'config.xml')
 
         with open(config_xml_path, 'rb') as config_file:
             config_xml_tree = etree.parse(config_file)
@@ -615,7 +667,7 @@ class CordovaAppBuilder:
         
     def config_xml_enable_wkwebview(self):
 
-        config_xml_path = os.path.join(self._app_cordova_folder, 'config.xml')
+        config_xml_path = os.path.join(self._app_cordova_path, 'config.xml')
 
         with open(config_xml_path, 'rb') as config_file:
             config_xml_tree = etree.parse(config_file)
@@ -705,7 +757,7 @@ class CordovaAppBuilder:
         self._build_blank_cordova_app('iOS', rebuild=rebuild)
         
         # set app version
-        self.set_config_xml_app_version(self.app_version, self.build_number)
+        self.set_config_xml_app_version(self.meta_app_definition.current_version, self.build_number)
 
         # set NSLocationWhenInUseUsageDescription
         self.set_ios_NSLocationWhenInUseUsageDescription()
@@ -729,7 +781,7 @@ class CordovaAppBuilder:
         add_ios_command = [self.cordova_bin, 'platform', 'add', CORDOVA_PLATFORM_VERSIONS['ios']]
 
         add_ios_completed_process = subprocess.run(add_ios_command, stdout=PIPE, stderr=PIPE,
-                                                   cwd=self._app_cordova_folder)
+                                                   cwd=self._app_cordova_path)
 
         if add_ios_completed_process.returncode != 0:
             if b'Platform ios already added' not in add_ios_completed_process.stderr:
@@ -740,7 +792,7 @@ class CordovaAppBuilder:
 
         # build ios images
         self.logger.info('building iOS launcher and splashscreen images')
-        image_creator = IOSAppImageCreator(self.meta_app_definition, self._app_cordova_folder,
+        image_creator = IOSAppImageCreator(self.meta_app_definition, self._app_cordova_path,
                                            self._user_content_folder, self.app_theme)
         
         image_creator.generate_images_from_svg('launcher', remove_alpha_channel=True)
@@ -757,7 +809,7 @@ class CordovaAppBuilder:
                              build_config_path]
 
         build_ios_process_completed = subprocess.run(build_ios_command, stdout=PIPE, stderr=PIPE,
-                                                     cwd=self._app_cordova_folder)
+                                                     cwd=self._app_cordova_path)
 
         if build_ios_process_completed.returncode != 0:
             raise CordovaBuildError(build_ios_process_completed.stderr)
