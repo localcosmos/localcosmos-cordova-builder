@@ -1,4 +1,5 @@
 LICENSE
+MANIFEST.in
 README.md
 setup.py
 localcosmos_cordova_builder/AppImageCreator.py
@@ -13,3 +14,5 @@ localcosmos_cordova_builder.egg-info/SOURCES.txt
 localcosmos_cordova_builder.egg-info/dependency_links.txt
 localcosmos_cordova_builder.egg-info/requires.txt
 localcosmos_cordova_builder.egg-info/top_level.txt
+localcosmos_cordova_builder/resources/images/adaptive_launcher_background.png
+localcosmos_cordova_builder/resources/images/adaptive_launcher_background.svg
