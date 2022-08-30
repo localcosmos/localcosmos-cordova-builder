@@ -64,7 +64,7 @@ def create_png_from_svg(svg_filepath, width, height, destination_filepath):
                     "--export-height={0}".format(height), svg_filepath]
 
         else:
-            command = ["inkscape", "--export-filename={0}".format(destination_filepath),
+            command = ["inkscape", "--export-png={0}".format(destination_filepath),
                     "--export-width={0}".format(width),
                     "--export-height={0}".format(height), svg_filepath]
         

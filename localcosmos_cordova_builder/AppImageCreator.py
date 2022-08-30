@@ -12,17 +12,9 @@ from .image_utils import (create_png_from_svg, create_resized_png_from_svg, crea
 # - the extension might differ from the existing_image_diskpath
 # - android adaptive launchers (foreground + background)
 
-'''
-APP_THEME_IMAGE_NAMES = {
-    'launcher' : 'app_launcher_icon',
-    'splashscreen' : 'app_splashscreen',
-    'launcher_background' : 'app_launcher_background',
-}
-'''
-
 
 FALLBACK_IMAGES = {
-    'launcher_background' : 'resources/images/adaptive_launcher_background.svg', # relative to this file
+    'launcherBackground' : 'resources/images/adaptive_launcher_background.svg', # relative to this file
 }
 
 
@@ -88,10 +80,10 @@ class AppImageCreator:
 
             if fallback_image is not None:
 
-                image_path = os.path.join(self.root, fallback_image)
+                image_filepath = os.path.join(self.root, fallback_image)
 
-                if not os.path.isfile(image_path):
-                    raise FileNotFoundError(image_path)
+                if not os.path.isfile(image_filepath):
+                    raise FileNotFoundError(image_filepath)
 
             else:
                 raise ValueError('No fallback image defined for {0}'.format(image_type))
@@ -131,12 +123,12 @@ class AndroidAppImageCreator(AppImageCreator):
     platform = 'android'
 
     definitions = {
-        'launcher_icon' : {
+        'launcherIcon' : {
             'subfolders_startwith' : 'mipmap-',
             'folder' : 'platforms/android/app/src/main/res',
             'filenames' : ['ic_launcher.png', 'ic_launcher_foreground.png'],
         },
-        'launcher_background' : {
+        'launcherBackground' : {
             'subfolders_startwith' : 'mipmap-',
             'folder' : 'platforms/android/app/src/main/res',
             'filenames' : ['ic_launcher_background.png'],
@@ -175,7 +167,7 @@ class IOSAppImageCreator(AppImageCreator):
     platform = 'ios'
 
     definitions = {
-        'launcher_icon' : {
+        'launcherIcon' : {
             'folder' : 'AppIcon.appiconset',
         },
         'splashscreen' : {

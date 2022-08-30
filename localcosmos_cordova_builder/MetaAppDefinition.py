@@ -61,13 +61,13 @@ class MetaAppDefinition:
 
         meta_app_definition['frontend'] = {
             'android' : {
-                'launcher_icon' : release_builder.get_asset_filename('android', 'launcher_icon'),
-                'launcher_background' : release_builder.get_asset_filename('android', 'launcher_background'),
+                'launcherIcon' : release_builder.get_asset_filename('android', 'launcherIcon'),
+                'launcherBackground' : release_builder.get_asset_filename('android', 'launcherBackground'),
                 'splashscreen' : release_builder.get_asset_filename('android', 'splashscreen')
             },
             'ios' : {
-                'launcher_icon' : release_builder.get_asset_filename('ios', 'launcher_icon'),
-                'launcher_background' : release_builder.get_asset_filename('ios', 'launcher_background'),
+                'launcherIcon' : release_builder.get_asset_filename('ios', 'launcherIcon'),
+                'launcherBackground' : release_builder.get_asset_filename('ios', 'launcherBackground'),
                 'splashscreen' : release_builder.get_asset_filename('ios', 'splashscreen')
             },
         }

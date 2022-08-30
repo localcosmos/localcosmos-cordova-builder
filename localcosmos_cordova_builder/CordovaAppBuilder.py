@@ -456,8 +456,8 @@ class CordovaAppBuilder:
         image_creator = AndroidAppImageCreator(self.meta_app_definition, self._app_cordova_path,
                                                 self._app_build_sources_path)
         
-        image_creator.generate_images_from_svg('launcher_icon')
-        image_creator.generate_images_from_svg('launcher_background')
+        image_creator.generate_images_from_svg('launcherIcon')
+        image_creator.generate_images_from_svg('launcherBackground')
         image_creator.generate_images_from_svg('splashscreen', varying_ratios=True)
 
         self.logger.info('initiating cordova build android')
