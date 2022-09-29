@@ -69,6 +69,7 @@ class CordovaAppBuilder:
         self.build_number = meta_app_definition.build_number
 
         # path where cordova projects (apps) are build
+        # eg version/5/release/cordova
         self._cordova_build_path = _cordova_build_path
         
         # the folder in which the "cordova" folder is created
@@ -77,12 +78,6 @@ class CordovaAppBuilder:
         # the www content of the app, without cordova.js
         self._app_build_sources_path = _app_build_sources_path
 
-        #self._user_content_folder = os.path.join(common_www_folder, 'user_content', 'themes',
-        #                                         self.meta_app_definition.theme)
-
-        # theme
-        #app_theme_path = os.path.join(common_www_folder, 'themes', meta_app_definition.theme)
-        #self.app_theme = AppTheme(app_theme_path)
 
     def _get_logger(self, smtp_logger={}):
 
@@ -149,6 +144,22 @@ class CordovaAppBuilder:
     @property
     def _cordova_www_path(self):
         return os.path.join(self._app_cordova_path, 'www')
+
+    @property
+    def config_xml_path(self):
+        return os.path.join(self._app_cordova_path, 'config.xml')
+
+    def _custom_config_xml_path(self, platform):
+
+        filename = 'config.xml'
+
+        if platform == 'android':
+            config_xml_path = os.path.join(self._android_sources_root, filename)
+
+        elif platform == 'ios':
+            config_xml_path = os.path.join(self._ios_sources_root, filename)
+        
+        return config_xml_path
 
 
     def load_cordova(self):
@@ -294,12 +305,18 @@ class CordovaAppBuilder:
     ###########################################################################################
     # CONFIG XML
     # - currently, only adding to <widget> is supported
+
+    def _add_custom_config_xml(self):
+        # self._app_cordova_path: version/5/release/cordova/APP_UID
+        # config.xml lies within that folder
+
+        
+        # copy supplied config.xml into cordova_app_path
+        pass
     
     def _add_to_config_xml(self, tag_name, tag_attributes={}):
 
-        config_xml_path = os.path.join(self._app_cordova_path, 'config.xml')
-
-        with open(config_xml_path, 'rb') as config_file:
+        with open(self.config_xml_path, 'rb') as config_file:
             config_xml_tree = etree.parse(config_file)
 
         # root is the widget tag
@@ -339,7 +356,7 @@ class CordovaAppBuilder:
             root.append(new_element)
 
             # xml_declaration: <?xml version='1.0' encoding='utf-8'?>
-            with open(config_xml_path, 'wb') as config_file:
+            with open(self.config_xml_path, 'wb') as config_file:
                 config_xml_tree.write(config_file, encoding='utf-8', xml_declaration=True, pretty_print=True)
 
 
@@ -347,9 +364,7 @@ class CordovaAppBuilder:
     # currently only major is supported
     def set_config_xml_app_version(self, app_version, build_number):
 
-        config_xml_path = os.path.join(self._app_cordova_path, 'config.xml')
-
-        with open(config_xml_path, 'rb') as config_file:
+        with open(self.config_xml_path, 'rb') as config_file:
             config_xml_tree = etree.parse(config_file)
 
         # root is the widget tag
@@ -359,7 +374,7 @@ class CordovaAppBuilder:
 
         root.set('version', version_string)
         
-        with open(config_xml_path, 'wb') as config_file:
+        with open(self.config_xml_path, 'wb') as config_file:
             config_xml_tree.write(config_file, encoding='utf-8', xml_declaration=True, pretty_print=True)
         
 
@@ -435,6 +450,12 @@ class CordovaAppBuilder:
         self.load_cordova()
 
         self._build_blank_cordova_app('Android', rebuild=rebuild)
+
+        # add custom config.xml if any
+        custom_config_xml_path = self._custom_config_xml_path(platform='android')
+
+        if os.path.isfile(custom_config_xml_path):
+            shutil.copyfile(custom_config_xml_path, self.config_xml_path)
 
         # set app version
         self.set_config_xml_app_version(self.meta_app_definition.current_version, self.build_number)
