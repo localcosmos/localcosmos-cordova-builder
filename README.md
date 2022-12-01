@@ -1,8 +1,7 @@
 # localcosmos-cordova-builder
 required environment variable: LOCALCOSMOS_CORDOVA_BUILDER_WORKDIR
 
-using python3 virtualenv
-^^^^^^^^^^^^^^^^^^^^^^^^
+## using python3 virtualenv
 
 add
 
