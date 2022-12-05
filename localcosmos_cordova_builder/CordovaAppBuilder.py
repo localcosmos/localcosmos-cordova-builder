@@ -39,10 +39,21 @@ from subprocess import CalledProcessError, PIPE
 
 from .AppImageCreator import AndroidAppImageCreator, IOSAppImageCreator
 
-
 from lxml import etree
 
 
+'''
+    has to be independant from django model instances and app builder instances, as it also runs on a mac
+
+     _cordova_build_path: root folder where cordova projects are created, inside the versioned app folder
+     e.g.: on linux with app kit: /{settings.APP_KIT_ROOT}/{APP_UUID}/version/{APP_VERSION}/release/cordova
+    
+     _app_packages_path: the path where to store the created app package
+    
+     _app_build_sources_path: a folder containing all files required for a successful build
+     e.g. on linux with app kit: /{settings.APP_KIT_ROOT}/{APP_UUID}/version/{APP_VERSION}/release/sources
+     subfolders of sources are_ common/www , android/www , ios/www
+'''
 class CordovaAppBuilder:
 
     # cordova creates aabs in these folders
@@ -58,10 +69,6 @@ class CordovaAppBuilder:
     ios_plugins = ['cordova-plugin-wkwebview-file-xhr']
 
 
-    # has to be independant from django model instances and app builder instances, as it also runs on a mac
-    # _cordova_build_path: root folder where cordova projects are created, inside the versioned app folder 
-    # _app_packages_path: the path where to store the created app package
-    # _app_build_sources_path: a folder containing all files required for a successful build
     def __init__(self, meta_app_definition, _cordova_build_path, _app_packages_path, _app_build_sources_path):
 
         self.meta_app_definition = meta_app_definition
@@ -376,54 +383,6 @@ class CordovaAppBuilder:
         
         with open(self.config_xml_path, 'wb') as config_file:
             config_xml_tree.write(config_file, encoding='utf-8', xml_declaration=True, pretty_print=True)
-        
-
-
-    ###########################################################################################
-    # GENERATE ZIPFILE FOR iOS Mac build
-    # the zipfile contains:
-    # - www folder
-    # - app content images folder
-    ###########################################################################################
-    def get_zip_filepath(self):
-        filename = 'cordova_www.zip'
-        return os.path.join(self._cordova_build_path, filename)
-    
-    
-    def create_zipfile(self):
-        self.logger.info('Creating zipfile for ios')
-
-        # get the parent direcotry of common_www
-        common_base_folder = os.path.abspath(os.path.join(self._common_www_folder, os.pardir))
-
-        # strip off this part from user_content_folder in the zipfile
-        user_content_base_folder = self._common_www_folder
-        
-        zip_filepath = self.get_zip_filepath()
-
-        with zipfile.ZipFile(zip_filepath, 'w', zipfile.ZIP_DEFLATED) as www_zip:
-
-            # add www
-            for root, dirs, files in os.walk(self._common_www_folder, followlinks=True):
-
-                for filename in files:
-                    # Create the full filepath by using os module.
-                    app_file_path = os.path.join(root, filename)
-                    arcname = app_file_path.split(common_base_folder)[-1]
-                    www_zip.write(app_file_path, arcname=arcname)
-
-
-            # add theme specific user_content
-            for root, dirs, files in os.walk(self._user_content_folder, followlinks=True):
-
-                for filename in files:
-                    # Create the full filepath by using os module.
-                    app_file_path = os.path.join(root, filename)
-                    arcname = app_file_path.split(user_content_base_folder)[-1]
-                    www_zip.write(app_file_path, arcname=arcname)
-
-        self.logger.info('Successfully created zipfile.')
-        return zip_filepath
 
 
     ##############################################################################################################
