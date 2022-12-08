@@ -1,5 +1,6 @@
-import os, shutil, logging
-from logging.handlers import SMTPHandler
+import os, shutil
+
+from localcosmos_cordova_builder.logger import get_logger
 
 # WORKDIR is the directory where node_modules and the cordova binary are installed
 WORKDIR = os.getenv('LOCALCOSMOS_CORDOVA_BUILDER_WORKDIR', None)
@@ -19,9 +20,7 @@ CORDOVA_PLUGIN_VERSIONS = {
     "cordova-plugin-splashscreen" : "cordova-plugin-splashscreen@6.0.0",
     "cordova-plugin-statusbar" : "cordova-plugin-statusbar@3.0.0",
     "cordova-sqlite-storage" : "cordova-sqlite-storage@6.0.0",
-
     "cordova-plugin-wkwebview-file-xhr" : "cordova-plugin-wkwebview-file-xhr@3.0.0",
-    
 }
 
 CORDOVA_PLATFORM_VERSIONS = {
@@ -33,7 +32,7 @@ class CordovaBuildError(Exception):
     pass
 
 
-import subprocess, os, shutil, zipfile, logging
+import subprocess, os, shutil, zipfile, logging, json
 from subprocess import CalledProcessError, PIPE
 
 
@@ -45,14 +44,14 @@ from lxml import etree
 '''
     has to be independant from django model instances and app builder instances, as it also runs on a mac
 
-     _cordova_build_path: root folder where cordova projects are created, inside the versioned app folder
-     e.g.: on linux with app kit: /{settings.APP_KIT_ROOT}/{APP_UUID}/version/{APP_VERSION}/release/cordova
-    
-     _app_packages_path: the path where to store the created app package
-    
-     _app_build_sources_path: a folder containing all files required for a successful build
-     e.g. on linux with app kit: /{settings.APP_KIT_ROOT}/{APP_UUID}/version/{APP_VERSION}/release/sources
-     subfolders of sources are_ common/www , android/www , ios/www
+    _cordova_build_path: root folder where cordova projects are created (command cordova create ...), inside the versioned app folder
+    e.g.: on linux with app kit: /{settings.APP_KIT_ROOT}/{APP_UUID}/version/{APP_VERSION}/release/cordova
+    e.g. on mac: /{jobmanager_settings.json['apps_root_folder']}/{APP_UUID}/version/{APP_VERSION}/release/cordova
+
+    _app_build_sources_path: a folder containing all files required for a successful build
+    e.g. on linux with app kit: /{settings.APP_KIT_ROOT}/{APP_UUID}/version/{APP_VERSION}/release/sources
+    e.g. on mac: /{jobmanager_settings.json['apps_root_folder']}/{APP_UUID}/version/{APP_VERSION}/release/sources
+    subfolders of sources are_ common/www , android/www , ios/www
 '''
 class CordovaAppBuilder:
 
@@ -69,7 +68,7 @@ class CordovaAppBuilder:
     ios_plugins = ['cordova-plugin-wkwebview-file-xhr']
 
 
-    def __init__(self, meta_app_definition, _cordova_build_path, _app_packages_path, _app_build_sources_path):
+    def __init__(self, meta_app_definition, _cordova_build_path, _app_build_sources_path):
 
         self.meta_app_definition = meta_app_definition
 
@@ -78,52 +77,37 @@ class CordovaAppBuilder:
         # path where cordova projects (apps) are build
         # eg version/5/release/cordova
         self._cordova_build_path = _cordova_build_path
-        
-        # the folder in which the "cordova" folder is created
-        self._app_packages_path = _app_packages_path
 
         # the www content of the app, without cordova.js
+        # eg version/5/release/sources/android or version/5/release/sources/ios
         self._app_build_sources_path = _app_build_sources_path
+        
+        settings_filepath = os.path.join(WORKDIR, 'app_builder_settings.json')
+        with open(settings_filepath, 'r') as settings_file:
+            self.settings = json.loads(settings_file.read())
+        
+        self.logger = self._get_logger()
 
 
     def _get_logger(self, smtp_logger={}):
 
         if hasattr(self, 'logger'):
             return self.logger
-
-        else:
-            logger = logging.getLogger(__name__)
-
-            logfile_name = self.meta_app_definition.uuid
-
-            logging_path = os.path.join(WORKDIR, 'log/cordova_app_builder/')
-
-            if not os.path.isdir(logging_path):
-                os.makedirs(logging_path)
-
-            logfile_path = os.path.join(logging_path, logfile_name)
-            formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-
-            # add FileHandler
-            file_hdlr = logging.FileHandler(logfile_path)
-            file_hdlr.setFormatter(formatter)
             
-            logger.addHandler(file_hdlr)
-            logger.setLevel(logging.INFO)
+        logger_name = '{0}-{1}'.format(__name__, self.__class__.__name__)
+        # for cross platform logging use a logfolder within the folder in which JobManager.py lies
+        logging_folder = os.path.join(WORKDIR, 'log/cordova_app_builder/')
+        logfile_name = self.meta_app_definition.uuid
 
+        smtp_logger = self.settings['email']
+        logger = get_logger(__name__, logging_folder, logfile_name, smtp_logger=smtp_logger)
 
-            # add smtp Handler
-            if smtp_logger:
-                smtp_hdlr = SMTPHandler((smtp_logger['host'], smtp_logger['port']), smtp_logger['from'], smtp_logger['to'],
-                                        'CordovaAppBuilder Error', credentials=smtp_logger['credentials'], secure=())
+        return logger
 
-                smtp_hdlr.setLevel(logging.ERROR)
-                logger.addHandler(smtp_hdlr)
-
-
-            return logger
-
-
+    #####################################################################################################
+    # PATHS
+    # it is intended to have the same folder within WORKDIR/apps (=apps root) layout on both linux and mac os
+    # see AppReleaseBuilder.py for comparison
     @property
     def _app_folder_name(self):
         return self.meta_app_definition.package_name
@@ -161,14 +145,14 @@ class CordovaAppBuilder:
         filename = 'config.xml'
 
         if platform == 'android':
-            config_xml_path = os.path.join(self._android_sources_root, filename)
+            custom_config_xml_path = os.path.join(self._android_sources_root, filename)
 
         elif platform == 'ios':
-            config_xml_path = os.path.join(self._ios_sources_root, filename)
+            custom_config_xml_path = os.path.join(self._ios_sources_root, filename)
         
-        return config_xml_path
+        return custom_config_xml_path
 
-
+    # installing the cordova CLI
     def load_cordova(self):
 
         self.logger.info('Loading cordova environment')
@@ -235,11 +219,15 @@ class CordovaAppBuilder:
     def _build_blank_cordova_app(self, platform, rebuild=False):
 
         if rebuild == True:
-            shutil.rmtree(self._cordova_build_path)
+            self.logger.info('rebuild is set to True. removing {0}'.format(self._cordova_build_path))
+            if os.path.isdir(self._cordova_build_path):
+                shutil.rmtree(self._cordova_build_path)
 
         # check for the cordova app
-        if not os.path.isdir(self._cordova_build_path):
-
+        if os.path.isdir(self._cordova_build_path):
+            self.logger.info('Cordova build path already exists: {0}'.format(self._cordova_build_path))
+            
+        else:
             os.makedirs(self._cordova_build_path)
 
             self.logger.info('Building initial blank cordova app')
@@ -281,11 +269,11 @@ class CordovaAppBuilder:
                 self._add_to_config_xml('preference', tag_attributes=tag_attributes)
             
 
-    ###########################################################################################
+    #####################################################################################################
     # add WWW
     # determine if the www folder already is the apps one: check for www/settings and www/features.js
 
-    def _add_www_folder (self, source_www_path, rebuild=False):
+    def _add_www_folder(self, source_www_path, rebuild=False):
 
         self.logger.info('Adding app www if necessary')
 
@@ -309,18 +297,9 @@ class CordovaAppBuilder:
             shutil.copytree(source_www_path, self._cordova_www_path)
         
 
-    ###########################################################################################
+    #####################################################################################################
     # CONFIG XML
     # - currently, only adding to <widget> is supported
-
-    def _add_custom_config_xml(self):
-        # self._app_cordova_path: version/5/release/cordova/APP_UID
-        # config.xml lies within that folder
-
-        
-        # copy supplied config.xml into cordova_app_path
-        pass
-    
     def _add_to_config_xml(self, tag_name, tag_attributes={}):
 
         with open(self.config_xml_path, 'rb') as config_file:
@@ -402,8 +381,6 @@ class CordovaAppBuilder:
     ##############################################################################################################
     def build_android(self, keystore_path, keystore_password, key_password, rebuild=False):
 
-        self.logger = self._get_logger()
-
         self.logger.info('Building cordova android app')
 
         self.load_cordova()
@@ -477,35 +454,25 @@ class CordovaAppBuilder:
     # - copy www
     # - run cordova build command
     ##############################################################################################################
-    def _get_ios_build_flags(self):
-
-        build_flags = {
-            '--codeSignIdentity' : 'iPhone Developer',
-            '--developmentTeam' : 'GMW7GRAP9D',
-            '--packageType' : 'app-store',
-        }
-
-        return build_flags
-
 
     @classmethod
     def get_ipa_filename(cls, meta_app_definition):
         filename = '{0}.ipa'.format(meta_app_definition.name)
         return filename
 
-
-    def get_ipa_folder(self):
+    @property
+    def _ipa_folder(self):
         return os.path.join(self._app_cordova_path, 'platforms/ios/build/device/')
 
-    def get_ipa_filepath(self):
+    @property
+    def _ipa_filepath(self):
         filename = self.get_ipa_filename(self.meta_app_definition)
-        return os.path.join(self.get_ipa_folder(), filename)
+        return os.path.join(self._ipa_folder, filename)
 
     # only set once, check if it already exists first
     def set_ios_info_plist_value(self, key, value):
-        config_xml_path = os.path.join(self._app_cordova_path, 'config.xml')
 
-        with open(config_xml_path, 'rb') as config_file:
+        with open(self.config_xml_path, 'rb') as config_file:
             config_xml_tree = etree.parse(config_file)
 
         # root is the widget tag
@@ -560,7 +527,7 @@ class CordovaAppBuilder:
             root.append(new_element)
 
             # xml_declaration: <?xml version='1.0' encoding='utf-8'?>
-            with open(config_xml_path, 'wb') as config_file:
+            with open(self.config_xml_path, 'wb') as config_file:
                 config_xml_tree.write(config_file, encoding='utf-8', xml_declaration=True, pretty_print=True)
     '''
     <edit-config target="NSLocationWhenInUseUsageDescription" file="*-Info.plist" mode="merge">
@@ -594,145 +561,12 @@ class CordovaAppBuilder:
         }
 
         self._add_to_config_xml('splash', tag_attributes=attributes_3x)
-
-    # <platform name="ios">
-    #   <allow-intent href="itms:*"/>
-    #   <allow-intent href="itms-apps:*"/>
-    #
-    #   <preference name="WKWebViewOnly" value="true"/>
-    #   <feature name="CDVWKWebViewEngine">
-    #      <param name="ios-package" value="CDVWKWebViewEngine"/>
-    #   </feature>
-    #   <preference name="CordovaWebViewEngine" value="CDVWKWebViewEngine"/>
-    #        
-    # </platform>
-    def create_wkwebviewonly_element(self):
-        attributes = {
-            'name' : 'WKWebViewOnly',
-            'value' : 'true',
-        }
-        new_element = etree.Element('preference', attrib=attributes)
-
-        return new_element
-    
-
-    def create_cordovawebviewengine_element(self):
-        attributes = {
-            'name' : 'CordovaWebViewEngine',
-            'value' : 'CDVWKWebViewEngine',
-        }
-        new_element = etree.Element('preference', attrib=attributes)
-
-        return new_element
-    
-
-    def create_cdvwkwebviewengine_feature(self):
-        attributes = {
-            'name' : 'CDVWKWebViewEngine',
-        }
-        feature_element = etree.Element('feature', attrib=attributes)
-
-        param_element_attributes = {
-            'name' : 'ios-package',
-            'value' : 'CDVWKWebViewEngine',
-        }
-
-        param_element = etree.Element('param', attrib=param_element_attributes)
-
-        feature_element.append(param_element)
-        
-        return feature_element
-        
-    
-        
-    def config_xml_enable_wkwebview(self):
-
-        config_xml_path = os.path.join(self._app_cordova_path, 'config.xml')
-
-        with open(config_xml_path, 'rb') as config_file:
-            config_xml_tree = etree.parse(config_file)
-
-        # root is the widget tag
-        root = config_xml_tree.getroot()
-
-        ios_platform_element = None
-        
-        for child in root:
-
-            # tag without namespace
-            tag_name = etree.QName(child.tag).localname
-            
-            if tag_name == 'platform':
-
-                attributes = child.attrib
-
-                if 'name' in attributes and attributes['name'] == 'ios':
-                    ios_platform_element = child
-                    break
-
-        if ios_platform_element == None:
-
-            ios_platform_element = etree.Element('platform', attrib={'name':'ios'}) 
-
-            wkwebviewonly_element = self.create_wkwebviewonly_element()
-            ios_platform_element.append(wkwebviewonly_element)
-
-            cordovawebviewengine_element = self.create_cordovawebviewengine_element()
-            ios_platform_element.append(cordovawebviewengine_element)
-
-            feature_element = self.create_cdvwkwebviewengine_feature()
-            ios_platform_element.append(feature_element)
-
-            root.append(ios_platform_element)
-
-        else:
-
-            wkwebviewonly_preference_exists = False
-            cordovawebviewengine_preference_exists = False
-            feature_element_exists = False
-
-            for platform_child in ios_platform_element:
-
-                tag_name = etree.QName(platform_child.tag).localname
-                attributes = platform_child.attrib
-
-                if tag_name == 'preference':
-
-                    if 'name' in attributes:
-
-                        name = attributes.get('name')
-
-                        if name == 'WKWebViewOnly':
-                            wkwebviewonly_preference_exists = True
-
-                        elif name == 'CordovaWebViewEngine':
-                            cordovawebviewengine_preference_exists = True
-
-                elif tag_name == 'feature':
-
-                    if 'name' in attributes and attributes['name'] == 'CDVWKWebViewEngine':
-                        feature_element_exists = True
-
-
-            if wkwebviewonly_preference_exists == False:
-                wkwebviewonly_element = self.create_wkwebviewonly_element()
-                ios_platform_element.append(wkwebviewonly_element)
-
-            if cordovawebviewengine_preference_exists == False:
-                cordovawebviewengine_element = self.create_cordovawebviewengine_element()
-                ios_platform_element.append(cordovawebviewengine_element)
-
-            if feature_element_exists == False:
-                feature_element = self.create_cdvwkwebviewengine_feature()
-                ios_platform_element.append(feature_element)
-                
-        with open(config_xml_path, 'wb') as config_file:
-            config_xml_tree.write(config_file, encoding='utf-8', xml_declaration=True, pretty_print=True)                
-    
     
     def build_ios(self, rebuild=False):
 
         self.logger.info('Building cordova ios app')
+        
+        self.load_cordova()
 
         self._build_blank_cordova_app('iOS', rebuild=rebuild)
         
@@ -754,7 +588,7 @@ class CordovaAppBuilder:
                                       'location access is required for observations and maps')
 
         # enable wkwebview
-        self.config_xml_enable_wkwebview()
+        # self.config_xml_enable_wkwebview()
 
 
         self.logger.info('Adding ios platform')
@@ -768,14 +602,14 @@ class CordovaAppBuilder:
                 raise CordovaBuildError(add_ios_completed_process.stderr)
 
         # ios has to copy www folder on each build
-        self._add_www_folder(rebuild=True)
+        self._add_www_folder(self._ios_www_path, rebuild=True)
 
         # build ios images
         self.logger.info('building iOS launcher and splashscreen images')
         image_creator = IOSAppImageCreator(self.meta_app_definition, self._app_cordova_path,
-                                           self._user_content_folder, self.app_theme)
+                                                self._app_build_sources_path)
         
-        image_creator.generate_images_from_svg('launcher', remove_alpha_channel=True)
+        image_creator.generate_images_from_svg('launcherIcon', remove_alpha_channel=True)
         image_creator.generate_images_from_svg('splashscreen', varying_ratios=True)
 
         self.set_config_xml_storyboard_images()
@@ -794,8 +628,8 @@ class CordovaAppBuilder:
         if build_ios_process_completed.returncode != 0:
             raise CordovaBuildError(build_ios_process_completed.stderr)
 
-
-        return self.get_ipa_filepath()
+        self.logger.info('successfully built ios')
+        return self._ipa_filepath(
 
 
 

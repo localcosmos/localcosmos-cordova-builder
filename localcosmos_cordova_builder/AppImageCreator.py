@@ -211,18 +211,18 @@ class IOSAppImageCreator(AppImageCreator):
         os.makedirs(screen_folder)
 
         
-        source_filename, source_image_path = self._get_source_image_diskpath(image_type)
+        source_image_filepath = self._get_source_image_diskpath(image_type)
 
-        if source_filename is None or source_image_path is None:
+        if source_image_filepath is None:
             raise ValueError('No {0} image found'.format(image_type))
         
 
         for storyboard_filename, size in self.definitions['storyboard'].items():
 
-            target_image_path = os.path.join(screen_folder, storyboard_filename)
+            target_image_filepath = os.path.join(screen_folder, storyboard_filename)
             width = size[0]
             height = size[1]
             
-            create_resized_png_from_svg(source_image_path, width, height, target_image_path)
+            create_resized_png_from_svg(source_image_filepath, width, height, target_image_filepath)
         
         

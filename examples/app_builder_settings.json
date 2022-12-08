@@ -1,0 +1,20 @@
+{
+	"localcosmos_server_url" : "http://myappkitserver.com/",
+	"api_url" : "http://myappkitserver.com/api/building/",
+	"platform" : "ios",
+	"apps_root_folder" : "/Users/tom/sisol/localcosmos-workspace/build/development/apps",
+	"auth" : {
+		"username" : "APPKITAPIUSERNAME",
+		"password" : "APPKITAPIUSERPASSWORD"
+	},
+    "email" : {
+        "host" : "",
+        "port" : 587,
+        "from" : "",
+        "to" : "",
+        "credentials" : {
+            "username" : "",
+            "password" : ""
+        }
+    }
+}

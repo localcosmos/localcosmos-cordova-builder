@@ -10,8 +10,8 @@ from urllib import request
 
 from .CordovaAppBuilder import CordovaAppBuilder
 
-from localcosmos_appkit_utils.MetaAppDefinition import MetaAppDefinition
-from localcosmos_appkit_utils.logger import get_logger
+from localcosmos_cordova_builder.MetaAppDefinition import MetaAppDefinition
+from localcosmos_cordova_builder.logger import get_logger
 
 from peewee import *
 
@@ -96,7 +96,7 @@ class JobManager:
     
     def __init__(self):
 
-        api_settings_filepath = os.path.join(WORKDIR, 'jobmanager_settings.json')
+        api_settings_filepath = os.path.join(WORKDIR, 'app_builder_settings.json')
 
         with open(api_settings_filepath, 'r') as settings_file:
             self.settings = json.loads(settings_file.read())
@@ -105,8 +105,11 @@ class JobManager:
             
 
     def _get_logger(self):
+    
+        if hasattr(self, 'logger'):
+            return self.logger
 
-        logger = logging.getLogger(__name__)
+        logger_name = '{0}-{1}'.format(__name__, self.__class__.__name__)
         # for cross platform logging use a logfolder within the folder in which JobManager.py lies
         logging_folder = os.path.join(WORKDIR, 'log/job_manager/')
 
@@ -115,6 +118,21 @@ class JobManager:
 
         return logger
 
+    @property
+    def apps_root_folder(self):
+        # same as settings.APP_KIT_ROOT on Linux/LCAppKit
+        return self.settings['apps_root_folder']
+        
+    def get_app_release_path(self, meta_app_definition):
+        return os.path.join(self.apps_root_folder, meta_app_definition.uuid, 'version', str(meta_app_definition.current_version), 'release')
+        
+    def get_app_build_sources_path(self, meta_app_definition):
+        app_release_path = self.get_app_release_path(meta_app_definition)
+        return os.path.join(app_release_path, 'sources')
+        
+    def get_cordova_build_path(self, meta_app_definition):
+        app_release_path = self.get_app_release_path(meta_app_definition)
+        return os.path.join(app_release_path, 'cordova')
     
     # update joblist an run jobs
     def update_joblist(self):
@@ -146,7 +164,6 @@ class JobManager:
                     db_job = results.get()
                     db_job.delete_instance()
                     
-
                 db_job = AppKitJob(
                     uuid = job['uuid'],
                     lc_id = job['id'],
@@ -162,7 +179,6 @@ class JobManager:
 
                 db_job.save()
 
-
                 if job['assigned_to'] == None:
 
                     assignment_data = {
@@ -177,20 +193,24 @@ class JobManager:
                     db_job.assignment_reported_at = datetime.datetime.now()
                     db_job.save()
                     
-
         db.close()
 
 
-
     def run_jobs(self, rerun_unsuccessful=False, from_scratch=False):
+    
+        self.logger.info('running jobs')
 
         db.connect()
 
         if rerun_unsuccessful == True:
+            self.logger.info('re-running unsuccessful jobs')
             unfinished_jobs = AppKitJob.select().where((AppKitJob.finished_at==None) | (AppKitJob.job_status=='failed'))
         else:
             unfinished_jobs = AppKitJob.select().where(AppKitJob.finished_at==None)
-            
+        
+        if not unfinished_jobs:
+            self.logger.info('no unfinished jobs found. maybe try --rerun-successful.')
+        
         for job in unfinished_jobs:
 
             job_method_name = 'run_{0}_job'.format(job.job_type)
@@ -230,18 +250,24 @@ class JobManager:
 
         db.close()
 
-            
+        self.logger.info('finished running all jobs (if any).')
+    
+    
     def run_build_job(self, job, from_scratch=False):
 
         meta_app_json = json.loads(job.meta_app_definition)
 
-        meta_app_definition = MetaAppDefinition(job.app_version, meta_app_definition=meta_app_json)
+        meta_app_definition = MetaAppDefinition(meta_app_definition=meta_app_json)
 
         # download zipfile and unzip it into a temporary folder
         parameters = json.loads(job.parameters)
         zipfile_url = urljoin(self.settings['localcosmos_server_url'], parameters['zipfile_url'])
 
-        zip_tmp_folder = os.path.join(self.settings['jobs_temp_folder'], str(job.uuid))
+        # app_build_sources_path is e.g. on linux with app kit: /{settings.APP_KIT_ROOT}/{APP_UUID}/version/{APP_VERSION}/release/sources
+        # subfolders of sources are_ common/www , android/www , ios/www
+        app_build_sources_path = self.get_app_build_sources_path(meta_app_definition)
+        
+        zip_tmp_folder = os.path.join(app_build_sources_path)
 
         if os.path.isdir(zip_tmp_folder):
             shutil.rmtree(zip_tmp_folder)
@@ -257,17 +283,15 @@ class JobManager:
             self.logger.error('error querying url: {0}'.format(zipfile_url))
             raise e
 
-        app_unzipped_path = os.path.join(zip_tmp_folder, 'app')
+        app_unzipped_path = os.path.join(zip_tmp_folder, job.platform)
         # unzip common www
         with zipfile.ZipFile(zipfile_path, 'r') as zip_file:
             zip_file.extractall(app_unzipped_path)
 
-        common_www_folder = os.path.join(app_unzipped_path, 'www')
-        # the folder where to create apps
-        app_root_folder = self._app_root_folder(meta_app_definition, job.app_version)
+        cordova_build_path = self.get_cordova_build_path(meta_app_definition)
 
-        cordova_app_builder = CordovaAppBuilder(meta_app_definition, app_root_folder,
-                                                common_www_folder)
+        cordova_app_builder = CordovaAppBuilder(meta_app_definition, cordova_build_path,
+                                                app_build_sources_path)
 
         cordova_app_builder.build_ios(rebuild=from_scratch)
 
@@ -285,16 +309,9 @@ class JobManager:
     # RELEASE JOB
     # first check if there is a successful build for this version
     # if not, build the app
-    # release via fastlane
+    # release via fastlane(?)
     def run_release_job(self, job, from_scratch=False):
         pass
-
-
-    def _app_root_folder(self, meta_app_definition, app_version):
-        apps_root_folder = self.settings['apps_root_folder']
-        app_root_folder = os.path.join(apps_root_folder, meta_app_definition.uuid, str(app_version))
-        return app_root_folder
-
 
     def _report_job_result(self, job):
         report_method_name = 'report_{0}_result'.format(job.job_type)
@@ -402,21 +419,30 @@ class LCAppkitApiRequest:
         self.files = files
 
         self.token_store_path = os.path.join(WORKDIR, 'token.json')
+        
+        self.logger = None
 
 
     def _get_logger(self):
+    
+        if not self.logger:
         
-        # for cross platform logging use a logfolder within the folder in which JobManager.py lies
-        logging_folder = os.path.join(WORKDIR, 'log/job_api/')
+            # for cross platform logging use a logfolder within the folder in which JobManager.py lies
+            logging_folder = os.path.join(WORKDIR, 'log/job_api/')
+            
+            logger_name = '{0}-{1}'.format(__name__, self.__class__.__name__)
 
-        logger = get_logger(__name__, logging_folder, 'log')
+            self.logger = get_logger(logger_name, logging_folder, 'log')
 
-        return logger
+        return self.logger
 
 
     def validate_token(self, token):
+    
+        logger = self._get_logger()
+        logger.info('validating token')
 
-        token_str = 'Token {0}'.format(token)
+        token_str = 'Bearer {0}'.format(token)
 
         headers = {
             'Authorization' : token_str,
@@ -426,9 +452,11 @@ class LCAppkitApiRequest:
         try:
             response = request.urlopen(api_request)
             response_data = json.loads(response.read())
+            logger.info('token is valid.')
             return token
 
         except:
+            logger.info('token is not valid.')
             return None
     
 
@@ -437,7 +465,7 @@ class LCAppkitApiRequest:
         if os.path.isfile(self.token_store_path):
             with open(self.token_store_path, 'r') as token_file:
                 token_store = json.loads(token_file.read())
-                token = token_store['token']
+                token = token_store['access']
                 token = self.validate_token(token)
 
                 if token is None:
@@ -455,13 +483,11 @@ class LCAppkitApiRequest:
             response = request.execute()
 
             if response is not None:
-                token = response['token']
-                token_store = {
-                    'token' : token,
-                }
+                token_dic = response
+                token = token_dic['access']
 
                 with open(self.token_store_path, 'w', encoding='utf-8') as token_file:
-                    json.dump(token_store, token_file, indent=4, ensure_ascii=False)
+                    json.dump(token_dic, token_file, indent=4, ensure_ascii=False)
             else:
                 raise LCAPIError('Authorization failed or Server unreachable')
 
@@ -471,7 +497,7 @@ class LCAppkitApiRequest:
         token = self.get_token()
         headers = {
             'Content-Type' : self.content_type,
-            'Authorization' : 'Token {0}'.format(token),
+            'Authorization' : 'Bearer {0}'.format(token),
         }
 
 

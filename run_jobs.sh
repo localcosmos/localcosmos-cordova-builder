@@ -3,7 +3,7 @@
 ##########################################################################################
 #
 # USAGE
-#	bash run_jobs.sh --python-venv /path/to/venv --workdir /path/to/workdir
+#	bash run_jobs.sh --python-venv /path/to/venv
 ##########################################################################################
 
 # required are PYTHON_ENV

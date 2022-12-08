@@ -11,6 +11,7 @@
 ##############################################################################################################
 
 from tendo.singleton import SingleInstance
+from localcosmos_cordova_builder.logger import get_logger
 from localcosmos_cordova_builder.JobManager import JobManager
 
 import os, json, sys, pathlib, getopt
@@ -23,15 +24,23 @@ if not WORKDIR:
 
 ERROR_RETRY_TIMEOUT_MINUTES = 5
 short_options = []
-long_options = ['force-run','rerun-unsuccessful']
+long_options = ['force-run','rerun-unsuccessful', 'from-scratch']
 
 
 if __name__ == "__main__":
+
+    logger_name = 'run_jobs'
+    logging_folder = os.path.join(WORKDIR, 'log/run_jobs/')
+
+    logger = get_logger(logger_name, logging_folder, 'log')
+    
+    logger.info('executed run_jobs.py')
 
     me = SingleInstance()
 
     force_run = False
     rerun_unsuccessful = False
+    from_scratch = False
 
     full_cmd_arguments = sys.argv
 
@@ -52,12 +61,17 @@ if __name__ == "__main__":
 
         elif argument == '--rerun-unsuccessful':
             rerun_unsuccessful = True
+        
+        elif argument == '--from-scratch':
+            from_scratch = True
 
     if force_run == True:
-        print('forcing the run')
+        logger.info('force-run is set to True')
 
     if rerun_unsuccessful == True:
-        print('rerunning previously unsuccessful jobs')
+        msg = 'rerun-unsuccessful is set to True'
+        print(msg)
+        logger.info(msg)
 
 
     error_count_path = os.path.join(WORKDIR, 'error_count.json')
@@ -72,8 +86,6 @@ if __name__ == "__main__":
             error_log = json.loads(logfile.read())
 
     if error_log['error_count'] < 10 or force_run == True:
-
-        job_manager = JobManager()
 
         run = True
 
@@ -92,12 +104,15 @@ if __name__ == "__main__":
             
         
         if run == True or force_run == True:
-            
+        
+            logger.info('instantiating JobManager')
+
+            job_manager = JobManager()
 
             try:
                 job_manager.update_joblist()
 
-                job_manager.run_jobs(rerun_unsuccessful=rerun_unsuccessful)
+                job_manager.run_jobs(rerun_unsuccessful=rerun_unsuccessful, from_scratch=from_scratch)
                 job_manager.report_job_results()
 
                 error_log['error_count'] = 0
@@ -113,5 +128,8 @@ if __name__ == "__main__":
 
             with open(error_count_path, 'w') as logfile:
                 logfile.write(json.dumps(error_log))
-            
-        
+
+        else:
+            print('Not running JobManager')
+            logger.info('not running JobManager. error_count: {0}. delta_minutes(timeout): {1}'.format(
+                    error_log['error_count'], delta_minutes))
