@@ -302,7 +302,7 @@ class JobManager:
         job.output = json.dumps(output)
         job.save()
 
-        # remove the folder where the cordova www was unzipped at
+        # remove the folder where the www folder was unzipped at
         shutil.rmtree(zip_tmp_folder)
 
 

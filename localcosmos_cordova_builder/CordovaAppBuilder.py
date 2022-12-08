@@ -275,30 +275,17 @@ class CordovaAppBuilder:
 
     #####################################################################################################
     # add WWW
-    # determine if the www folder already is the apps one: check for www/settings and www/features.js
+    # determine if the www folder already is the apps one: check for www/settings,json
 
-    def _add_www_folder(self, source_www_path, rebuild=False):
+    def _add_cordova_www_folder(self, source_www_path):
 
-        self.logger.info('Adding app www if necessary')
+        self.logger.info('Adding app www, removing if already exists')
 
-        app_www_exists = True
-
-        check_files = ['settings.json']
-
-        for filename in check_files:
-
-            filepath = os.path.join(self._cordova_www_path, filename)
-
-            if not os.path.isfile(filepath):
-                app_www_exists = False
-                break
-
-        if app_www_exists == False or rebuild == True:
-            
+        if os.path.isdir(self._cordova_www_path):
             shutil.rmtree(self._cordova_www_path)
 
-            # copy common www, cordova cannot work with symlinks
-            shutil.copytree(source_www_path, self._cordova_www_path)
+        # copy common www, cordova cannot work with symlinks
+        shutil.copytree(source_www_path, self._cordova_www_path)
         
 
     #####################################################################################################
@@ -410,7 +397,8 @@ class CordovaAppBuilder:
         if add_android_completed_process.returncode != 0:
             raise CordovaBuildError(add_android_completed_process.stderr)
         
-        self._add_www_folder(self._android_www_path, rebuild=True)
+        # replace cordova default www with android www
+        self._add_cordova_www_folder(self._android_www_path)
 
         # build android images
         self.logger.info('building Android launcher and splashscreen images')
@@ -605,8 +593,8 @@ class CordovaAppBuilder:
             if b'Platform ios already added' not in add_ios_completed_process.stderr:
                 raise CordovaBuildError(add_ios_completed_process.stderr)
 
-        # ios has to copy www folder on each build
-        self._add_www_folder(self._ios_www_path, rebuild=True)
+        # replace default cordova www folder with ios www
+        self._add_cordova_www_folder(self._ios_www_path)
 
         # build ios images
         self.logger.info('building iOS launcher and splashscreen images')
