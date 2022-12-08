@@ -296,7 +296,7 @@ class JobManager:
         cordova_app_builder.build_ios(rebuild=from_scratch)
 
         output = {
-            'ipa_filepath' : cordova_app_builder.get_ipa_filepath(),
+            'ipa_filepath' : cordova_app_builder._ipa_filepath,
         }
 
         job.output = json.dumps(output)
