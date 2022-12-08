@@ -5,3 +5,4 @@ __pycache__
 *.pyc
 *.directory
 *.sqlite3
+.DS_Store
