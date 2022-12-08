@@ -82,11 +82,16 @@ class CordovaAppBuilder:
         # eg version/5/release/sources/android or version/5/release/sources/ios
         self._app_build_sources_path = _app_build_sources_path
         
+        # currently settings are only used for the smtp logger
+        smtp_logger = {}
         settings_filepath = os.path.join(WORKDIR, 'app_builder_settings.json')
-        with open(settings_filepath, 'r') as settings_file:
-            self.settings = json.loads(settings_file.read())
         
-        self.logger = self._get_logger()
+        if os.path.isfile(settings_filepath):
+            with open(settings_filepath, 'r') as settings_file:
+                cab_settings = json.loads(settings_file.read())
+                smtp_logger = cab_settings['email']
+            
+        self.logger = self._get_logger(smtp_logger=smtp_logger)
 
 
     def _get_logger(self, smtp_logger={}):
@@ -99,7 +104,6 @@ class CordovaAppBuilder:
         logging_folder = os.path.join(WORKDIR, 'log/cordova_app_builder/')
         logfile_name = self.meta_app_definition.uuid
 
-        smtp_logger = self.settings['email']
         logger = get_logger(__name__, logging_folder, logfile_name, smtp_logger=smtp_logger)
 
         return logger
@@ -629,7 +633,7 @@ class CordovaAppBuilder:
             raise CordovaBuildError(build_ios_process_completed.stderr)
 
         self.logger.info('successfully built ios')
-        return self._ipa_filepath(
+        return self._ipa_filepath
 
 
 

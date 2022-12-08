@@ -41,20 +41,22 @@ class MetaAppDefinition:
     @classmethod
     def meta_app_to_dict(cls, meta_app):
 
-        meta_app_definition = {}
+        fields = ['uuid', 'published_version', 'current_version']
+
+        meta_app_definition = {
+            'uid' : meta_app.app.uid,
+            'build_settings' : meta_app.build_settings,
+        }
+
         
-        for field in meta_app._meta.concrete_fields:
-            if field.concrete == True:
+        for field_name in ['uuid', 'name', 'primary_language', 'published_version', 'current_version', 'package_name',
+                'build_number', 'build_status', 'validation_status']:
+            
+            field_value = getattr(meta_app, field_name)
+            json_value = cls._to_json(field_value)
 
-                field_value = field.value_from_object(meta_app)
-                json_value = cls._to_json(field_value)
+            meta_app_definition[field_name] = json_value
 
-                meta_app_definition[field.name] = json_value
-                
-
-        for field_name in ['uuid', 'name', 'primary_language']:
-            field_value = cls._to_json(getattr(meta_app.app, field_name))
-            meta_app_definition[field_name] = field_value
 
         # frontend definitions
         release_builder = meta_app.get_release_builder()
