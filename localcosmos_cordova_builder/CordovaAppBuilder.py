@@ -59,6 +59,8 @@ class CordovaAppBuilder:
     unsigned_release_aab_output_path = 'platforms/android/app/build/outputs/bundle/release/app-release-unsigned.aab'
     signed_release_aab_output_path = 'platforms/android/app/build/outputs/bundle/release/app-release.aab'
 
+    debug_apk_output_path = 'platforms/android/app/build/outputs/apk/debug/app-debug.apk'
+
     default_plugins = ['cordova-plugin-device', 'cordova-plugin-network-information', 'cordova-plugin-file',
                        'cordova-plugin-dialogs', 'cordova-plugin-splashscreen', 'cordova-sqlite-storage',
                        'cordova-plugin-datepicker', 'cordova-plugin-statusbar', 'cordova-plugin-camera',
@@ -409,7 +411,7 @@ class CordovaAppBuilder:
         image_creator.generate_images_from_svg('launcherBackground')
         image_creator.generate_images_from_svg('splashscreen', varying_ratios=True)
 
-        self.logger.info('initiating cordova build android')
+        self.logger.info('initiating cordova build android for release aab')
         build_android_command = [self.cordova_bin, 'build', 'android', '--release', '--',
                                  '--keystore={0}'.format(keystore_path),
                                  '--storePassword={0}'.format(keystore_password),
@@ -421,21 +423,32 @@ class CordovaAppBuilder:
         if build_android_process_completed.returncode != 0:
             raise CordovaBuildError(build_android_process_completed.stderr)
 
+        # build debug apk
+        self.logger.info('initiating cordova build android for debug apk')
+        build_android_apk_command = [self.cordova_bin, 'build', 'android', '--',
+                                 '--keystore={0}'.format(keystore_path),
+                                 '--storePassword={0}'.format(keystore_password),
+                                 '--alias=localcosmos', '--password={0}'.format(key_password)]
 
-        return self._aab_filepath
+        build_android_apk_process_completed = subprocess.run(build_android_apk_command, stdout=PIPE, stderr=PIPE,
+                                                         cwd=self._app_cordova_path)
+
+        if build_android_apk_process_completed.returncode != 0:
+            raise CordovaBuildError(build_android_apk_process_completed.stderr)
+
+
+        return self._aab_filepath, self._apk_filepath
 
 
     @property
     def _aab_filepath(self):
+        # uses the default .aab filename created by cordova
         return os.path.join(self._app_cordova_path, self.signed_release_aab_output_path)
 
     @property
-    def _aab_filename(self):
-        package_name = self.meta_app_definition.package_name
-        version = self.meta_app_definition.current_version
-        build_number = self.meta_app_definition.build_number
-        filename = '{0}-{1}-{2}.aab'.format(package_name, version, build_number)
-        return filename
+    def _apk_filepath(self):
+        # uses the default .apk filename created by cordova
+        return os.path.join(self._app_cordova_path, self.debug_apk_output_path)
 
 
     ##############################################################################################################
