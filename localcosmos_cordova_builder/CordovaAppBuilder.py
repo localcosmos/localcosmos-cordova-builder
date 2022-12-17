@@ -225,7 +225,8 @@ class CordovaAppBuilder:
                 raise CordovaBuildError(process_completed.stderr)
             
 
-    def _build_blank_cordova_app(self, platform, rebuild=False):
+    # rebuild should be set to False once we are out of development
+    def _build_blank_cordova_app(self, platform, rebuild=True):
 
         if rebuild == True:
             self.logger.info('rebuild is set to True. removing {0}'.format(self._cordova_build_path))
