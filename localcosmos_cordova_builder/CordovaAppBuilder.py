@@ -28,6 +28,9 @@ CORDOVA_PLATFORM_VERSIONS = {
     "ios" : "ios@6.2.0",
 }
 
+PLATFORM_IOS = 'ios'
+PLATFORM_ANDROID = 'android'
+
 class CordovaBuildError(Exception):
     pass
 
@@ -210,7 +213,7 @@ class CordovaAppBuilder:
 
         commands = []
 
-        if platform == 'iOS':
+        if platform == PLATFORM_IOS:
             for plugin in self.ios_plugins:
                 commands.append([self.cordova_bin, 'plugin', 'add', CORDOVA_PLUGIN_VERSIONS[plugin]])
 
@@ -252,6 +255,36 @@ class CordovaAppBuilder:
 
             if create_process_completed.returncode != 0:
                 raise CordovaBuildError(create_process_completed.stderr)
+
+            # add custom config.xml if any
+            custom_config_xml_path = self._custom_config_xml_path(platform=platform)
+
+            if os.path.isfile(custom_config_xml_path):
+                self.logger.info('Copying custom config xml')
+                shutil.copyfile(custom_config_xml_path, self.config_xml_path)
+                
+                with open(self.config_xml_path, 'rb') as config_file:
+                    config_xml_tree = etree.parse(config_file)
+                
+                
+                # make sure widget.id and <name> are set correctly
+                # <widget xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0" id="[package_name]" version="5.0.385">
+                # <name>[self.meta_app_definition.name]</name>
+                
+                root = xml_tree.getroot()
+                root.attrib['id'] = package_name
+                
+                for child in root:
+                    tag_name = etree.QName(child.tag).localname
+                    if tag_name == 'name':
+                        child.text = self.meta_app_definition.name
+                        break
+                
+                with open(self.config_xml_path, 'wb') as config_file:
+                    xml_tree.write(config_file, encoding='utf-8', xml_declaration=True, pretty_print=True)
+                
+                
+
                 
             self.install_default_plugins()
 
@@ -274,7 +307,7 @@ class CordovaAppBuilder:
             for tag_attributes in preferences:
                 self._add_to_config_xml('preference', tag_attributes=tag_attributes)
             
-
+    
     #####################################################################################################
     # add WWW
     # determine if the www folder already is the apps one: check for www/settings,json
@@ -378,13 +411,7 @@ class CordovaAppBuilder:
 
         self.load_cordova()
 
-        self._build_blank_cordova_app('Android', rebuild=rebuild)
-
-        # add custom config.xml if any
-        custom_config_xml_path = self._custom_config_xml_path(platform='android')
-
-        if os.path.isfile(custom_config_xml_path):
-            shutil.copyfile(custom_config_xml_path, self.config_xml_path)
+        self._build_blank_cordova_app(PLATFORM_ANDROID, rebuild=rebuild)
 
         # set app version
         self.set_config_xml_app_version(self.meta_app_definition.current_version, self.build_number)
@@ -573,15 +600,7 @@ class CordovaAppBuilder:
         
         self.load_cordova()
 
-        self._build_blank_cordova_app('iOS', rebuild=rebuild)
-
-        self._build_blank_cordova_app('Android', rebuild=rebuild)
-
-        # add custom config.xml if any
-        custom_config_xml_path = self._custom_config_xml_path(platform='ios')
-
-        if os.path.isfile(custom_config_xml_path):
-            shutil.copyfile(custom_config_xml_path, self.config_xml_path)
+        self._build_blank_cordova_app(PLATFORM_IOS, rebuild=rebuild)
         
         # set app version
         self.set_config_xml_app_version(self.meta_app_definition.current_version, self.build_number)
@@ -602,7 +621,6 @@ class CordovaAppBuilder:
 
         # enable wkwebview
         # self.config_xml_enable_wkwebview()
-
 
         self.logger.info('Adding ios platform')
         add_ios_command = [self.cordova_bin, 'platform', 'add', CORDOVA_PLATFORM_VERSIONS['ios']]
