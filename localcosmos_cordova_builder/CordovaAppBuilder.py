@@ -574,6 +574,14 @@ class CordovaAppBuilder:
         self.load_cordova()
 
         self._build_blank_cordova_app('iOS', rebuild=rebuild)
+
+        self._build_blank_cordova_app('Android', rebuild=rebuild)
+
+        # add custom config.xml if any
+        custom_config_xml_path = self._custom_config_xml_path(platform='ios')
+
+        if os.path.isfile(custom_config_xml_path):
+            shutil.copyfile(custom_config_xml_path, self.config_xml_path)
         
         # set app version
         self.set_config_xml_app_version(self.meta_app_definition.current_version, self.build_number)
