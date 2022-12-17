@@ -261,15 +261,14 @@ class CordovaAppBuilder:
 
             if os.path.isfile(custom_config_xml_path):
                 self.logger.info('Copying custom config xml')
-                shutil.copyfile(custom_config_xml_path, self.config_xml_path)
-                
-                with open(self.config_xml_path, 'rb') as config_file:
-                    config_xml_tree = etree.parse(config_file)
-                
+                shutil.copyfile(custom_config_xml_path, self.config_xml_path)                
                 
                 # make sure widget.id and <name> are set correctly
                 # <widget xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0" id="[package_name]" version="5.0.385">
                 # <name>[self.meta_app_definition.name]</name>
+
+                with open(self.config_xml_path, 'rb') as config_file:
+                    xml_tree = etree.parse(config_file)
                 
                 root = xml_tree.getroot()
                 root.attrib['id'] = package_name
@@ -282,9 +281,6 @@ class CordovaAppBuilder:
                 
                 with open(self.config_xml_path, 'wb') as config_file:
                     xml_tree.write(config_file, encoding='utf-8', xml_declaration=True, pretty_print=True)
-                
-                
-
                 
             self.install_default_plugins()
 
