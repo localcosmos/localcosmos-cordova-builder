@@ -26,10 +26,12 @@ CORDOVA_PLUGIN_VERSIONS = {
 CORDOVA_PLATFORM_VERSIONS = {
     "android" : "android@10.1.2",
     "ios" : "ios@6.2.0",
+    "browser" : "browser@6.0.0",
 }
 
 PLATFORM_IOS = 'ios'
 PLATFORM_ANDROID = 'android'
+PLATFORM_BROWSER = 'browser'
 
 class CordovaBuildError(Exception):
     pass
@@ -83,8 +85,7 @@ class CordovaAppBuilder:
         # eg version/5/release/cordova
         self._cordova_build_path = _cordova_build_path
 
-        # the www content of the app, without cordova.js
-        # eg version/5/release/sources/android or version/5/release/sources/ios
+        # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/
         self._app_build_sources_path = _app_build_sources_path
         
         # currently settings are only used for the smtp logger
@@ -121,26 +122,27 @@ class CordovaAppBuilder:
     def _app_folder_name(self):
         return self.meta_app_definition.package_name
 
-    @property
-    def _android_sources_root(self):
-        return os.path.join(self._app_build_sources_path, 'android')
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/android
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/ios
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/browser
+    def _get_platform_sources_root(self, platform):
+        return os.path.join(self._app_build_sources_path, platform)
 
-    @property
-    def _android_www_path(self):
-        return os.path.join(self._android_sources_root, 'www')
 
-    @property
-    def _ios_sources_root(self):
-        return os.path.join(self._app_build_sources_path, 'ios')
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/android/www
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/ios/www
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/browser/www
+    def _get_platform_www_path(self, platform):
+        platform_sources_root = self._get_platform_sources_root(platform)
+        return os.path.join(platform_sources_root, 'www')
 
-    @property
-    def _ios_www_path(self):
-        return os.path.join(self._ios_sources_root, 'www')
 
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/cordova
     @property
     def _app_cordova_path(self):
         return os.path.join(self._cordova_build_path, self._app_folder_name)
 
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/cordova/www
     @property
     def _cordova_www_path(self):
         return os.path.join(self._app_cordova_path, 'www')
@@ -153,11 +155,8 @@ class CordovaAppBuilder:
 
         filename = 'config.xml'
 
-        if platform == 'android':
-            custom_config_xml_path = os.path.join(self._android_sources_root, filename)
-
-        elif platform == 'ios':
-            custom_config_xml_path = os.path.join(self._ios_sources_root, filename)
+        platform_sources_root = self._get_platform_sources_root(platform)
+        custom_config_xml_path = os.path.join(platform_sources_root, filename)
         
         return custom_config_xml_path
 
@@ -226,7 +225,7 @@ class CordovaAppBuilder:
             
 
     # rebuild should be set to False once we are out of development
-    def _build_blank_cordova_app(self, platform, rebuild=True):
+    def _build_blank_cordova_app(self, rebuild=True):
 
         if rebuild == True:
             self.logger.info('rebuild is set to True. removing {0}'.format(self._cordova_build_path))
@@ -253,68 +252,72 @@ class CordovaAppBuilder:
             create_process_completed = subprocess.run(create_command, stdout=PIPE, stderr=PIPE,
                                                       cwd=self._cordova_build_path)
 
-
             if create_process_completed.returncode != 0:
                 raise CordovaBuildError(create_process_completed.stderr)
 
-            # add custom config.xml if any
-            custom_config_xml_path = self._custom_config_xml_path(platform=platform)
+            self.logger.info('successfully built initial blank cordova app')
 
-            if os.path.isfile(custom_config_xml_path):
-                self.logger.info('Copying custom config xml')
-                shutil.copyfile(custom_config_xml_path, self.config_xml_path)                
-                
-                # make sure widget.id and <name> are set correctly
-                # <widget xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0" id="[package_name]" version="5.0.385">
-                # <name>[self.meta_app_definition.name]</name>
-
-                with open(self.config_xml_path, 'rb') as config_file:
-                    xml_tree = etree.parse(config_file)
-                
-                root = xml_tree.getroot()
-                root.attrib['id'] = package_name
-                
-                for child in root:
-                    tag_name = etree.QName(child.tag).localname
-                    if tag_name == 'name':
-                        child.text = self.meta_app_definition.name
-                        break
-                
-                with open(self.config_xml_path, 'wb') as config_file:
-                    xml_tree.write(config_file, encoding='utf-8', xml_declaration=True, pretty_print=True)
-                
-            self.install_default_plugins()
-
-            self.install_specific_plugins(platform)
-
-            # add stuff to config
-            # <preference name="SplashMaintainAspectRatio" value="true" />
-            # <preference name="StatusBarStyle" value="blackopaque" />
-            # <preference name="StatusBarOverlaysWebView" value="false" />
-            # <preference name="StatusBarBackgroundColor" value="#000000" />
-
-            preferences = [
-                {'name' : 'SplashMaintainAspectRatio', 'value' : 'true'},
-                {'name' : 'StatusBarStyle', 'value' : 'blackopaque'},
-                {'name' : 'StatusBarOverlaysWebView', 'value' : 'false'},
-                {'name' : 'StatusBarBackgroundColor', 'value' : '#000000'},
-                {'name' : 'DisallowOverscroll', 'value': 'true'},
-            ]
-
-            for tag_attributes in preferences:
-                self._add_to_config_xml('preference', tag_attributes=tag_attributes)
             
+    def _update_config_xml(self, platform):
+
+        package_name = self.meta_app_definition.package_name
+
+        # add custom config.xml if any
+        custom_config_xml_path = self._custom_config_xml_path(platform=platform)
+
+        if os.path.isfile(custom_config_xml_path):
+            self.logger.info('Copying custom config xml')
+            shutil.copyfile(custom_config_xml_path, self.config_xml_path)                
+            
+            # make sure widget.id and <name> are set correctly
+            # <widget xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0" id="[package_name]" version="5.0.385">
+            # <name>[self.meta_app_definition.name]</name>
+
+            with open(self.config_xml_path, 'rb') as config_file:
+                xml_tree = etree.parse(config_file)
+            
+            root = xml_tree.getroot()
+            root.attrib['id'] = package_name
+            
+            for child in root:
+                tag_name = etree.QName(child.tag).localname
+                if tag_name == 'name':
+                    child.text = self.meta_app_definition.name
+                    break
+            
+            with open(self.config_xml_path, 'wb') as config_file:
+                xml_tree.write(config_file, encoding='utf-8', xml_declaration=True, pretty_print=True)
+
+        # add stuff to config
+        # <preference name="SplashMaintainAspectRatio" value="true" />
+        # <preference name="StatusBarStyle" value="blackopaque" />
+        # <preference name="StatusBarOverlaysWebView" value="false" />
+        # <preference name="StatusBarBackgroundColor" value="#000000" />
+
+        preferences = [
+            {'name' : 'SplashMaintainAspectRatio', 'value' : 'true'},
+            {'name' : 'StatusBarStyle', 'value' : 'blackopaque'},
+            {'name' : 'StatusBarOverlaysWebView', 'value' : 'false'},
+            {'name' : 'StatusBarBackgroundColor', 'value' : '#000000'},
+            {'name' : 'DisallowOverscroll', 'value': 'true'},
+        ]
+
+        for tag_attributes in preferences:
+            self._add_to_config_xml('preference', tag_attributes=tag_attributes)
+        
     
     #####################################################################################################
     # add WWW
     # determine if the www folder already is the apps one: check for www/settings,json
 
-    def _add_cordova_www_folder(self, source_www_path):
+    def _add_cordova_www_folder(self, platform):
 
         self.logger.info('Adding app www, removing if already exists')
 
         if os.path.isdir(self._cordova_www_path):
             shutil.rmtree(self._cordova_www_path)
+
+        source_www_path = self._get_platform_www_path(platform)
 
         # copy common www, cordova cannot work with symlinks
         shutil.copytree(source_www_path, self._cordova_www_path)
@@ -408,7 +411,12 @@ class CordovaAppBuilder:
 
         self.load_cordova()
 
-        self._build_blank_cordova_app(PLATFORM_ANDROID, rebuild=rebuild)
+        self._build_blank_cordova_app(rebuild=rebuild)
+
+        self._update_config_xml(PLATFORM_ANDROID)
+
+        self.install_default_plugins()
+        self.install_specific_plugins(PLATFORM_ANDROID)
 
         # set app version
         self.set_config_xml_app_version(self.meta_app_definition.current_version, self.build_number)
@@ -424,7 +432,7 @@ class CordovaAppBuilder:
             raise CordovaBuildError(add_android_completed_process.stderr)
         
         # replace cordova default www with android www
-        self._add_cordova_www_folder(self._android_www_path)
+        self._add_cordova_www_folder(PLATFORM_ANDROID)
 
         # build android images
         self.logger.info('building Android launcher and splashscreen images')
@@ -579,7 +587,6 @@ class CordovaAppBuilder:
     # res folder lies in the same folder as www
     def set_config_xml_storyboard_images(self):
 
-
         attributes_2x = {
             'src' : 'res/screen/ios/Default@2x~universal~anyany.png'
         }
@@ -597,7 +604,12 @@ class CordovaAppBuilder:
         
         self.load_cordova()
 
-        self._build_blank_cordova_app(PLATFORM_IOS, rebuild=rebuild)
+        self._build_blank_cordova_app(rebuild=rebuild)
+
+        self._update_config_xml(PLATFORM_IOS)
+
+        self.install_default_plugins()
+        self.install_specific_plugins(PLATFORM_IOS)
         
         # set app version
         self.set_config_xml_app_version(self.meta_app_definition.current_version, self.build_number)
@@ -630,7 +642,7 @@ class CordovaAppBuilder:
                 raise CordovaBuildError(add_ios_completed_process.stderr)
 
         # replace default cordova www folder with ios www
-        self._add_cordova_www_folder(self._ios_www_path)
+        self._add_cordova_www_folder(PLATFORM_IOS)
 
         # build ios images
         self.logger.info('building iOS launcher and splashscreen images')
@@ -658,6 +670,85 @@ class CordovaAppBuilder:
 
         self.logger.info('successfully built ios')
         return self._ipa_filepath
+
+
+    ##############################################################################################################
+    # BUILD browser .zip
+    # - create blank cordova app, if not yet present
+    # - install plugins
+    # - copy config.xml and other files
+    # - copy www
+    # - run cordova build command
+    ##############################################################################################################
+
+    @property
+    def _browser_zip_filepath(self):
+        filename = '{0}.zip'.format(self.meta_app_definition.name)
+        return os.path.join(self._app_cordova_path, 'platforms/browser', filename)
+
+
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/cordova/{meta_app_definition.package_name}/platforms/browser/www
+    @property
+    def _browser_built_www_path(self):
+        # uses the default .apk filename created by cordova
+        return os.path.join(self._app_cordova_path, 'platforms/browser/www')
+
+    def build_browser(self, rebuild=False, build_zip=False):
+        
+        self.logger.info('Building cordova browser app')
+
+        self.load_cordova()
+
+        self._build_blank_cordova_app(rebuild=rebuild)
+
+        self._update_config_xml(PLATFORM_BROWSER)
+
+        self.install_default_plugins()
+        self.install_specific_plugins(PLATFORM_BROWSER)
+
+        # set app version
+        self.set_config_xml_app_version(self.meta_app_definition.current_version, self.build_number)
+
+        self.logger.info('Adding browser platform')
+        add_browser_command = [self.cordova_bin, 'platform', 'add', CORDOVA_PLATFORM_VERSIONS['browser']]
+
+        add_browser_completed_process = subprocess.run(add_browser_command, stdout=PIPE, stderr=PIPE,
+                                                       cwd=self._app_cordova_path)
+
+        if add_browser_completed_process.returncode != 0:
+            raise CordovaBuildError(add_browser_completed_process.stderr)
+
+        # replace cordova default www with android www
+        self._add_cordova_www_folder(PLATFORM_BROWSER)
+
+        # build ios release
+        self.logger.info('initiating cordova build browser')
+
+        build_browser_command = [self.cordova_bin, 'build', 'browser', '--release']
+
+        build_browser_process_completed = subprocess.run(build_browser_command, stdout=PIPE, stderr=PIPE,
+                                                     cwd=self._app_cordova_path)
+
+        if build_browser_process_completed.returncode != 0:
+            raise CordovaBuildError(build_browser_process_completed.stderr)
+
+        if build_zip == True:
+            self.logger.info('building zip_file for browser')
+
+            zip_filepath = self._browser_zip_filepath
+
+            with zipfile.ZipFile(zip_filepath, 'w', zipfile.ZIP_DEFLATED) as www_zip:
+
+                for root, dirs, files in os.walk(self._browser_built_www_path, followlinks=True):
+
+                    for filename in files:
+                        # Create the full filepath by using os module.
+                        app_file_path = os.path.join(root, filename)
+                        arcname = app_file_path.split(self._browser_built_www_path)[-1]
+                        www_zip.write(app_file_path, arcname=arcname)
+
+        self.logger.info('successfully built browser')
+        return self._browser_built_www_path, self._browser_zip_filepath
 
 
 
