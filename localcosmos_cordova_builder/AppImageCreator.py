@@ -217,7 +217,7 @@ class IOSAppImageCreator(AppImageCreator):
 
     def generate_storyboard_images(self):
 
-        image_type = 'splashscreen'
+        image_type = 'appSplashscreen'
 
         res_folder = os.path.join(self.app_cordova_folder, 'res')
 

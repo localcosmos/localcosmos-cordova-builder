@@ -264,17 +264,16 @@ class JobManager:
         zipfile_url = urljoin(self.settings['localcosmos_server_url'], parameters['zipfile_url'])
 
         # app_build_sources_path is e.g. on linux with app kit: /{settings.APP_KIT_ROOT}/{APP_UUID}/version/{APP_VERSION}/release/sources
-        # subfolders of sources are_ common/www , android/www , ios/www
         app_build_sources_path = self.get_app_build_sources_path(meta_app_definition)
-        
-        zip_tmp_folder = os.path.join(app_build_sources_path)
 
-        if os.path.isdir(zip_tmp_folder):
-            shutil.rmtree(zip_tmp_folder)
+        if os.path.isdir(app_build_sources_path):
+            shutil.rmtree(app_build_sources_path)
             
-        os.makedirs(zip_tmp_folder)
+        os.makedirs(app_build_sources_path)
 
-        zipfile_path = os.path.join(zip_tmp_folder, 'app.zip')
+        # unzip ro release/
+        app_release_path = self.get_app_release_path(meta_app_definition)
+        zipfile_path = os.path.join(app_release_path, 'app.zip')
 
         # dl the file
         try:
@@ -283,7 +282,7 @@ class JobManager:
             self.logger.error('error querying url: {0}'.format(zipfile_url))
             raise e
 
-        app_unzipped_path = os.path.join(zip_tmp_folder, job.platform)
+        app_unzipped_path = app_build_sources_path
         # unzip common www
         with zipfile.ZipFile(zipfile_path, 'r') as zip_file:
             zip_file.extractall(app_unzipped_path)
@@ -303,7 +302,7 @@ class JobManager:
         job.save()
 
         # remove the folder where the www folder was unzipped at
-        shutil.rmtree(zip_tmp_folder)
+        shutil.rmtree(app_unzipped_path)
 
 
     # RELEASE JOB
