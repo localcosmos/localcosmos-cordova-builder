@@ -1,5 +1,7 @@
 import os, shutil
 
+from .required_assets import REQUIRED_ASSETS
+
 from localcosmos_cordova_builder.logger import get_logger
 
 # WORKDIR is the directory where node_modules and the cordova binary are installed
@@ -37,7 +39,7 @@ class CordovaBuildError(Exception):
     pass
 
 
-import subprocess, os, shutil, zipfile, logging, json
+import subprocess, os, shutil, zipfile, json
 from subprocess import CalledProcessError, PIPE
 
 
@@ -122,27 +124,17 @@ class CordovaAppBuilder:
     def _app_folder_name(self):
         return self.meta_app_definition.package_name
 
-    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/android
-    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/ios
-    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/browser
-    def _get_platform_sources_root(self, platform):
-        return os.path.join(self._app_build_sources_path, platform)
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/www
+    @property
+    def _app_build_sources_www_path(self):
+        return os.path.join(self._app_build_sources_path, 'www')
 
-
-    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/android/www
-    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/ios/www
-    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/browser/www
-    def _get_platform_www_path(self, platform):
-        platform_sources_root = self._get_platform_sources_root(platform)
-        return os.path.join(platform_sources_root, 'www')
-
-
-    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/cordova
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/cordova/{package_name}/
     @property
     def _app_cordova_path(self):
         return os.path.join(self._cordova_build_path, self._app_folder_name)
 
-    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/cordova/www
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/cordova/{package_name}/www/
     @property
     def _cordova_www_path(self):
         return os.path.join(self._app_cordova_path, 'www')
@@ -151,14 +143,9 @@ class CordovaAppBuilder:
     def config_xml_path(self):
         return os.path.join(self._app_cordova_path, 'config.xml')
 
-    def _custom_config_xml_path(self, platform):
-
-        filename = 'config.xml'
-
-        platform_sources_root = self._get_platform_sources_root(platform)
-        custom_config_xml_path = os.path.join(platform_sources_root, filename)
-        
-        return custom_config_xml_path
+    @property
+    def _custom_config_xml_path(self):
+        return os.path.join(self._app_build_sources_path, 'config.xml')
 
     # installing the cordova CLI
     def load_cordova(self):
@@ -258,12 +245,12 @@ class CordovaAppBuilder:
             self.logger.info('successfully built initial blank cordova app')
 
             
-    def _update_config_xml(self, platform):
+    def _update_config_xml(self):
 
         package_name = self.meta_app_definition.package_name
 
         # add custom config.xml if any
-        custom_config_xml_path = self._custom_config_xml_path(platform=platform)
+        custom_config_xml_path = self._custom_config_xml_path
 
         if os.path.isfile(custom_config_xml_path):
             self.logger.info('Copying custom config xml')
@@ -310,14 +297,14 @@ class CordovaAppBuilder:
     # add WWW
     # determine if the www folder already is the apps one: check for www/settings,json
 
-    def _add_cordova_www_folder(self, platform):
+    def _add_cordova_www_folder(self):
 
         self.logger.info('Adding app www, removing if already exists')
 
         if os.path.isdir(self._cordova_www_path):
             shutil.rmtree(self._cordova_www_path)
 
-        source_www_path = self._get_platform_www_path(platform)
+        source_www_path = os.path.join(self._app_build_sources_path, 'www')
 
         # copy common www, cordova cannot work with symlinks
         shutil.copytree(source_www_path, self._cordova_www_path)
@@ -413,7 +400,7 @@ class CordovaAppBuilder:
 
         self._build_blank_cordova_app(rebuild=rebuild)
 
-        self._update_config_xml(PLATFORM_ANDROID)
+        self._update_config_xml()
 
         self.install_default_plugins()
         self.install_specific_plugins(PLATFORM_ANDROID)
@@ -432,16 +419,16 @@ class CordovaAppBuilder:
             raise CordovaBuildError(add_android_completed_process.stderr)
         
         # replace cordova default www with android www
-        self._add_cordova_www_folder(PLATFORM_ANDROID)
+        self._add_cordova_www_folder()
 
         # build android images
         self.logger.info('building Android launcher and splashscreen images')
         image_creator = AndroidAppImageCreator(self.meta_app_definition, self._app_cordova_path,
                                                 self._app_build_sources_path)
         
-        image_creator.generate_images_from_svg('launcherIcon')
-        image_creator.generate_images_from_svg('launcherBackground')
-        image_creator.generate_images_from_svg('splashscreen', varying_ratios=True)
+        for image_type, image_filename in REQUIRED_ASSETS.items():
+            image_creator.generate_images_from_svg(image_type)
+        
 
         self.logger.info('initiating cordova build android for release aab')
         build_android_command = [self.cordova_bin, 'build', 'android', '--release', '--',
@@ -467,7 +454,6 @@ class CordovaAppBuilder:
 
         if build_android_apk_process_completed.returncode != 0:
             raise CordovaBuildError(build_android_apk_process_completed.stderr)
-
 
         return self._aab_filepath, self._apk_filepath
 
@@ -606,7 +592,7 @@ class CordovaAppBuilder:
 
         self._build_blank_cordova_app(rebuild=rebuild)
 
-        self._update_config_xml(PLATFORM_IOS)
+        self._update_config_xml()
 
         self.install_default_plugins()
         self.install_specific_plugins(PLATFORM_IOS)
@@ -642,15 +628,15 @@ class CordovaAppBuilder:
                 raise CordovaBuildError(add_ios_completed_process.stderr)
 
         # replace default cordova www folder with ios www
-        self._add_cordova_www_folder(PLATFORM_IOS)
+        self._add_cordova_www_folder()
 
         # build ios images
         self.logger.info('building iOS launcher and splashscreen images')
         image_creator = IOSAppImageCreator(self.meta_app_definition, self._app_cordova_path,
                                                 self._app_build_sources_path)
-        
-        image_creator.generate_images_from_svg('launcherIcon', remove_alpha_channel=True)
-        image_creator.generate_images_from_svg('splashscreen', varying_ratios=True)
+                                                
+        for image_type, image_filename in REQUIRED_ASSETS.items():
+            image_creator.generate_images_from_svg(image_type)
 
         self.set_config_xml_storyboard_images()
         image_creator.generate_storyboard_images()
@@ -701,7 +687,7 @@ class CordovaAppBuilder:
 
         self._build_blank_cordova_app(rebuild=rebuild)
 
-        self._update_config_xml(PLATFORM_BROWSER)
+        self._update_config_xml()
 
         self.install_default_plugins()
         self.install_specific_plugins(PLATFORM_BROWSER)
@@ -719,7 +705,7 @@ class CordovaAppBuilder:
             raise CordovaBuildError(add_browser_completed_process.stderr)
 
         # replace cordova default www with android www
-        self._add_cordova_www_folder(PLATFORM_BROWSER)
+        self._add_cordova_www_folder()
 
         # build ios release
         self.logger.info('initiating cordova build browser')

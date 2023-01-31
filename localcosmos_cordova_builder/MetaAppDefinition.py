@@ -5,7 +5,6 @@
 # - helper class
 # - ios app builder runs on mac and has no django orm access
 
-from platform import release
 import uuid
 from datetime import datetime, date
 
@@ -41,7 +40,8 @@ class MetaAppDefinition:
     @classmethod
     def meta_app_to_dict(cls, meta_app):
 
-        fields = ['uuid', 'published_version', 'current_version']
+        fields = ['uuid', 'name', 'primary_language', 'published_version', 'current_version', 'package_name',
+                    'build_number', 'build_status', 'validation_status']
 
         meta_app_definition = {
             'uid' : meta_app.app.uid,
@@ -49,30 +49,12 @@ class MetaAppDefinition:
         }
 
         
-        for field_name in ['uuid', 'name', 'primary_language', 'published_version', 'current_version', 'package_name',
-                'build_number', 'build_status', 'validation_status']:
+        for field_name in fields:
             
             field_value = getattr(meta_app, field_name)
             json_value = cls._to_json(field_value)
 
             meta_app_definition[field_name] = json_value
-
-
-        # frontend definitions
-        release_builder = meta_app.get_release_builder()
-
-        meta_app_definition['frontend'] = {
-            'android' : {
-                'launcherIcon' : release_builder.get_asset_filename('android', 'launcherIcon'),
-                'launcherBackground' : release_builder.get_asset_filename('android', 'launcherBackground'),
-                'splashscreen' : release_builder.get_asset_filename('android', 'splashscreen')
-            },
-            'ios' : {
-                'launcherIcon' : release_builder.get_asset_filename('ios', 'launcherIcon'),
-                'launcherBackground' : release_builder.get_asset_filename('ios', 'launcherBackground'),
-                'splashscreen' : release_builder.get_asset_filename('ios', 'splashscreen')
-            },
-        }
 
         return meta_app_definition
         

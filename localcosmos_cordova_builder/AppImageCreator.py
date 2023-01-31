@@ -4,6 +4,7 @@ from PIL import Image
 from .image_utils import (create_png_from_svg, create_resized_png_from_svg, create_png_border,
                                        remove_alpha_channel_from_png)
 
+from .required_assets import REQUIRED_ASSETS
 ###########################################################################################
 # GENERATE IMAGES
 # - generate app images from svg
@@ -14,7 +15,7 @@ from .image_utils import (create_png_from_svg, create_resized_png_from_svg, crea
 
 
 FALLBACK_IMAGES = {
-    'launcherBackground' : 'resources/images/adaptive_launcher_background.svg', # relative to this file
+    'appLauncherBackground' : 'resources/images/adaptive_launcher_background.svg', # relative to this file
 }
 
 
@@ -34,45 +35,51 @@ class AppImageCreator:
         raise NotImplementedError()
         
 
-    def generate_images_from_svg(self, image_type, varying_ratios=False, remove_alpha_channel=False):
+    def generate_images_from_svg(self, image_type):
 
-        source_image_filepath = self._get_source_image_diskpath(image_type)
+        if image_type in self.definitions:
 
+            image_definition = self.definitions[image_type]
 
-        for icon_folder, filename in self.iterate_over_default_image_files(image_type):
+            varying_ratios = image_definition.get('varying_ratios', False)
+            remove_alpha_channel = image_definition.get('remove_alpha_channel', False)
 
-            cordova_default_image_path = os.path.join(icon_folder, filename)
+            source_image_filepath = self._get_source_image_diskpath(image_type)
 
-            # scan the file and overwrite it via a file generated from svg
-            cordova_default_image = Image.open(cordova_default_image_path)
+            for icon_folder, filename in self.iterate_over_default_image_files(image_type):
 
-            width, height = cordova_default_image.size
+                cordova_default_image_path = os.path.join(icon_folder, filename)
 
-            cordova_default_image.close()
+                # scan the file and overwrite it via a file generated from svg
+                cordova_default_image = Image.open(cordova_default_image_path)
 
-            if varying_ratios == False:
+                width, height = cordova_default_image.size
 
-                if filename == 'ic_launcher_foreground.png' and self.platform == 'android':
-                    self._generate_adaptive_launcher(source_image_filepath, width, height,
-                                                     cordova_default_image_path)
+                cordova_default_image.close()
 
-                else:
-                    create_png_from_svg(source_image_filepath, width, height,
-                                        cordova_default_image_path)
+                if varying_ratios == False:
 
-            else:
-                create_resized_png_from_svg(source_image_filepath, width, height,
+                    if filename == 'ic_launcher_foreground.png' and self.platform == 'android':
+                        self._generate_adaptive_launcher(source_image_filepath, width, height,
+                                                        cordova_default_image_path)
+
+                    else:
+                        create_png_from_svg(source_image_filepath, width, height,
                                             cordova_default_image_path)
 
-            if remove_alpha_channel == True:
-                remove_alpha_channel_from_png(cordova_default_image_path)
+                else:
+                    create_resized_png_from_svg(source_image_filepath, width, height,
+                                                cordova_default_image_path)
+
+                if remove_alpha_channel == True:
+                    remove_alpha_channel_from_png(cordova_default_image_path)
 
     
     # source svg file
     def _get_source_image_diskpath(self, image_type):
 
-        filename = self.meta_app_definition.frontend[self.platform][image_type]
-        image_filepath = os.path.join(self.app_build_sources_path, self.platform, 'assets', filename)
+        filename = REQUIRED_ASSETS[image_type]
+        image_filepath = os.path.join(self.app_build_sources_path, 'assets', filename)
 
         if not os.path.isfile(image_filepath):
 
@@ -123,20 +130,26 @@ class AndroidAppImageCreator(AppImageCreator):
     platform = 'android'
 
     definitions = {
-        'launcherIcon' : {
+        'appLauncherIcon' : {
             'subfolders_startwith' : 'mipmap-',
             'folder' : 'platforms/android/app/src/main/res',
             'filenames' : ['ic_launcher.png', 'ic_launcher_foreground.png'],
+            'varying_ratios' : False,
+            'remove_alpha_channel' : False,
         },
-        'launcherBackground' : {
+        'appLauncherBackground' : {
             'subfolders_startwith' : 'mipmap-',
             'folder' : 'platforms/android/app/src/main/res',
             'filenames' : ['ic_launcher_background.png'],
+            'varying_ratios' : False,
+            'remove_alpha_channel' : False,
         },
-        'splashscreen' : {
+        'appSplashscreen' : {
             'subfolders_startwith' : 'drawable-',
             'folder' : 'platforms/android/app/src/main/res',
             'filenames' : ['screen.png'],
+            'varying_ratios' : True,
+            'remove_alpha_channel' : False,
         }
     }
 
@@ -167,11 +180,15 @@ class IOSAppImageCreator(AppImageCreator):
     platform = 'ios'
 
     definitions = {
-        'launcherIcon' : {
+        'appLauncherIcon' : {
             'folder' : 'AppIcon.appiconset',
+            'varying_ratios' : False,
+            'remove_alpha_channel' : True,
         },
-        'splashscreen' : {
+        'appSplashscreen' : {
             'folder' : 'LaunchStoryboard.imageset',
+            'varying_ratios' : True,
+            'remove_alpha_channel' : False,
         },
         'storyboard' : {
             'Default@2x~universal~anyany.png' : [2732,2732],
