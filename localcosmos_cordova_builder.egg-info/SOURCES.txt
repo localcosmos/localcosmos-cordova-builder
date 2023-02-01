@@ -9,6 +9,7 @@ localcosmos_cordova_builder/MetaAppDefinition.py
 localcosmos_cordova_builder/__init__.py
 localcosmos_cordova_builder/image_utils.py
 localcosmos_cordova_builder/logger.py
+localcosmos_cordova_builder/required_assets.py
 localcosmos_cordova_builder/urllib_request_upload_files.py
 localcosmos_cordova_builder.egg-info/PKG-INFO
 localcosmos_cordova_builder.egg-info/SOURCES.txt

@@ -11,21 +11,7 @@ if not WORKDIR:
 
 CORDOVA_CLI_VERSION = '11.0.0'
 
-CORDOVA_PLUGIN_VERSIONS = {
-    "cordova-plugin-camera" : "cordova-plugin-camera@6.0.0",
-    "cordova-plugin-datepicker" : "cordova-plugin-datepicker@0.9.3",
-    "cordova-plugin-device": "cordova-plugin-device@2.0.3",
-    "cordova-plugin-dialogs" : "cordova-plugin-dialogs@2.0.2",
-    "cordova-plugin-file" : "cordova-plugin-file@6.0.2",
-    "cordova-plugin-geolocation" : "cordova-plugin-geolocation@4.1.0",
-    "cordova-plugin-network-information" : "cordova-plugin-network-information@3.0.0",
-    "cordova-plugin-splashscreen" : "cordova-plugin-splashscreen@6.0.0",
-    "cordova-plugin-statusbar" : "cordova-plugin-statusbar@3.0.0",
-    "cordova-sqlite-storage" : "cordova-sqlite-storage@6.0.0",
-    "cordova-plugin-wkwebview-file-xhr" : "cordova-plugin-wkwebview-file-xhr@3.0.0",
-}
-
-CORDOVA_PLATFORM_VERSIONS = {
+DEFAULT_CORDOVA_PLATFORM_VERSIONS = {
     "android" : "android@10.1.2",
     "ios" : "ios@6.2.0",
     "browser" : "browser@6.0.0",
@@ -67,14 +53,6 @@ class CordovaAppBuilder:
     signed_release_aab_output_path = 'platforms/android/app/build/outputs/bundle/release/app-release.aab'
 
     debug_apk_output_path = 'platforms/android/app/build/outputs/apk/debug/app-debug.apk'
-
-    default_plugins = ['cordova-plugin-device', 'cordova-plugin-network-information', 'cordova-plugin-file',
-                       'cordova-plugin-dialogs', 'cordova-plugin-splashscreen', 'cordova-sqlite-storage',
-                       'cordova-plugin-datepicker', 'cordova-plugin-statusbar', 'cordova-plugin-camera',
-                       'cordova-plugin-geolocation']
-
-    # this might be obsolete in cordova-ios@6.2.0
-    ios_plugins = ['cordova-plugin-wkwebview-file-xhr']
 
 
     def __init__(self, meta_app_definition, _cordova_build_path, _app_build_sources_path):
@@ -180,29 +158,36 @@ class CordovaAppBuilder:
 
     #######################################################################################################
     # blank app and plugins
+    def _get_cordova_platform_version(self, platform):
+
+        platform_version = DEFAULT_CORDOVA_PLATFORM_VERSIONS[platform]
+
+        frontend_settings = self.meta_app_definition.frontend
+        cordova_settings = frontend_settings.get('cordova', {})
+        platforms = cordova_settings.get('platforms', {})
+        
+        if platform in platforms:
+            platform_version = platforms[platform]
+
+        return platform_version
+
+
+    def _get_cordova_plugins(self):
     
-    def install_default_plugins(self):
+        frontend_settings = self.meta_app_definition.frontend
+        cordova_settings = frontend_settings.get('cordova', {})
+        plugins = cordova_settings.get('plugins', [])
+
+        return plugins
+
+    
+    def _install_cordova_plugins(self):
 
         commands = []
 
-        for plugin in self.default_plugins:
-            commands.append([self.cordova_bin, 'plugin', 'add', CORDOVA_PLUGIN_VERSIONS[plugin]])
-
-        for command in commands:
-            process_completed = subprocess.run(command, stdout=PIPE, stderr=PIPE, cwd=self._app_cordova_path)
-
-            if process_completed.returncode != 0:
-                raise CordovaBuildError(process_completed.stderr)
-
-
-    def install_specific_plugins(self, platform):
-
-        commands = []
-
-        if platform == PLATFORM_IOS:
-            for plugin in self.ios_plugins:
-                commands.append([self.cordova_bin, 'plugin', 'add', CORDOVA_PLUGIN_VERSIONS[plugin]])
-
+        plugins = self._get_cordova_plugins()
+        for plugin in plugins:
+            commands.append([self.cordova_bin, 'plugin', 'add', plugin])
 
         for command in commands:
             process_completed = subprocess.run(command, stdout=PIPE, stderr=PIPE, cwd=self._app_cordova_path)
@@ -402,14 +387,14 @@ class CordovaAppBuilder:
 
         self._update_config_xml()
 
-        self.install_default_plugins()
-        self.install_specific_plugins(PLATFORM_ANDROID)
+        self._install_cordova_plugins()
 
         # set app version
         self.set_config_xml_app_version(self.meta_app_definition.current_version, self.build_number)
 
         self.logger.info('Adding android platform')
-        add_android_command = [self.cordova_bin, 'platform', 'add', CORDOVA_PLATFORM_VERSIONS['android']]
+        platform_version = self._get_cordova_platform_version(PLATFORM_ANDROID)
+        add_android_command = [self.cordova_bin, 'platform', 'add', platform_version]
 
 
         add_android_completed_process = subprocess.run(add_android_command, stdout=PIPE, stderr=PIPE,
@@ -594,8 +579,7 @@ class CordovaAppBuilder:
 
         self._update_config_xml()
 
-        self.install_default_plugins()
-        self.install_specific_plugins(PLATFORM_IOS)
+        self._install_cordova_plugins()
         
         # set app version
         self.set_config_xml_app_version(self.meta_app_definition.current_version, self.build_number)
@@ -618,7 +602,8 @@ class CordovaAppBuilder:
         # self.config_xml_enable_wkwebview()
 
         self.logger.info('Adding ios platform')
-        add_ios_command = [self.cordova_bin, 'platform', 'add', CORDOVA_PLATFORM_VERSIONS['ios']]
+        platform_version = self._get_cordova_platform_version(PLATFORM_IOS)
+        add_ios_command = [self.cordova_bin, 'platform', 'add', platform_version]
 
         add_ios_completed_process = subprocess.run(add_ios_command, stdout=PIPE, stderr=PIPE,
                                                    cwd=self._app_cordova_path)
@@ -689,14 +674,14 @@ class CordovaAppBuilder:
 
         self._update_config_xml()
 
-        self.install_default_plugins()
-        self.install_specific_plugins(PLATFORM_BROWSER)
+        self._install_cordova_plugins()
 
         # set app version
         self.set_config_xml_app_version(self.meta_app_definition.current_version, self.build_number)
 
         self.logger.info('Adding browser platform')
-        add_browser_command = [self.cordova_bin, 'platform', 'add', CORDOVA_PLATFORM_VERSIONS['browser']]
+        platform_version = self._get_cordova_platform_version(PLATFORM_BROWSER)
+        add_browser_command = [self.cordova_bin, 'platform', 'add', platform_version]
 
         add_browser_completed_process = subprocess.run(add_browser_command, stdout=PIPE, stderr=PIPE,
                                                        cwd=self._app_cordova_path)
@@ -777,7 +762,6 @@ class CordovaManager:
 
         cordova_install_command_result = subprocess.run(cordova_install_command, stdout=PIPE, stderr=PIPE,
                                                         cwd=WORKDIR)
-
 
         if cordova_install_command_result.returncode != 0:
             raise CordovaBuildError(cordova_install_command_result.stderr)

@@ -46,6 +46,7 @@ class MetaAppDefinition:
         meta_app_definition = {
             'uid' : meta_app.app.uid,
             'build_settings' : meta_app.build_settings,
+            'frontend' : {},
         }
 
         
@@ -55,6 +56,13 @@ class MetaAppDefinition:
             json_value = cls._to_json(field_value)
 
             meta_app_definition[field_name] = json_value
+
+        # it doesn ot matter if AppReleaseBuilder or AppPreviewBuilder is used
+        # both read the frontend settings from the currently globally installed frontend
+        appbuilder = meta_app.get_release_builder()
+        frontend_settings = appbuilder._get_frontend_settings()
+
+        meta_app_definition['frontend']['cordova'] = frontend_settings.get('cordova', {})
 
         return meta_app_definition
         
