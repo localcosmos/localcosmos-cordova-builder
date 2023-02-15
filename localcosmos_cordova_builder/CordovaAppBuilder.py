@@ -713,9 +713,8 @@ class CordovaAppBuilder:
                 for root, dirs, files in os.walk(self._browser_built_www_path, followlinks=True):
 
                     for filename in files:
-                        # Create the full filepath by using os module.
                         app_file_path = os.path.join(root, filename)
-                        arcname = app_file_path.split(self._browser_built_www_path)[-1]
+                        arcname ='www/{0}'.format(app_file_path.split(self._browser_built_www_path)[-1])
                         www_zip.write(app_file_path, arcname=arcname)
 
         self.logger.info('successfully built browser')
