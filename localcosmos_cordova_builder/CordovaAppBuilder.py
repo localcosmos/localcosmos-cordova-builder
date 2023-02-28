@@ -12,7 +12,7 @@ if not WORKDIR:
 CORDOVA_CLI_VERSION = '11.0.0'
 
 DEFAULT_CORDOVA_PLATFORM_VERSIONS = {
-    "android" : "android@10.1.2",
+    "android" : "android@11.0.0",
     "ios" : "ios@6.2.0",
     "browser" : "browser@6.0.0",
 }
@@ -85,14 +85,14 @@ class CordovaAppBuilder:
         if hasattr(self, 'logger'):
             return self.logger
             
-        logger_name = '{0}-{1}'.format(__name__, self.__class__.__name__)
+        logger_name = '{0}-logger'.format(self.__class__.__name__)
         # for cross platform logging use a logfolder within the folder in which JobManager.py lies
         logging_folder = os.path.join(WORKDIR, 'log/cordova_app_builder/')
         logfile_name = self.meta_app_definition.uuid
 
-        logger = get_logger(__name__, logging_folder, logfile_name, smtp_logger=smtp_logger)
+        self.logger = get_logger(logger_name, logging_folder, logfile_name, smtp_logger=smtp_logger)
 
-        return logger
+        return self.logger
 
     #####################################################################################################
     # PATHS
@@ -392,8 +392,9 @@ class CordovaAppBuilder:
         # set app version
         self.set_config_xml_app_version(self.meta_app_definition.current_version, self.build_number)
 
-        self.logger.info('Adding android platform')
         platform_version = self._get_cordova_platform_version(PLATFORM_ANDROID)
+
+        self.logger.info('Adding android platform {0}'.format(platform_version))
         add_android_command = [self.cordova_bin, 'platform', 'add', platform_version]
 
 
