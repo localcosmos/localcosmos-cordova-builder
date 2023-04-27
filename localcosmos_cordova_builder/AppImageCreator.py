@@ -16,6 +16,7 @@ from .required_assets import REQUIRED_ASSETS
 
 FALLBACK_IMAGES = {
     'appLauncherBackground' : 'resources/images/adaptive_launcher_background.svg', # relative to this file
+    'appLauncherIcon' : 'resources/images/appLauncherIcon.svg', # relative to this file
 }
 
 
@@ -144,13 +145,13 @@ class AndroidAppImageCreator(AppImageCreator):
             'varying_ratios' : False,
             'remove_alpha_channel' : False,
         },
-        'appSplashscreen' : {
-            'subfolders_startwith' : 'drawable-',
-            'folder' : 'platforms/android/app/src/main/res',
-            'filenames' : ['screen.png'],
-            'varying_ratios' : True,
-            'remove_alpha_channel' : False,
-        }
+        #'appSplashscreen' : {
+        #    'subfolders_startwith' : 'drawable-',
+        #    'folder' : 'platforms/android/app/src/main/res',
+        #    'filenames' : ['screen.png'],
+        #    'varying_ratios' : True,
+        #    'remove_alpha_channel' : False,
+        #}
     }
 
 
@@ -243,3 +244,26 @@ class IOSAppImageCreator(AppImageCreator):
             create_resized_png_from_svg(source_image_filepath, width, height, target_image_filepath)
         
         
+class BrowserAppImageCreator(AppImageCreator):
+
+    def create_favicon(self):
+
+        launcher_source = self._get_source_image_diskpath('appLauncherIcon')
+
+        app_www_folder = os.path.join(self.app_cordova_folder, 'www')
+
+        ico_target_path = os.path.join(app_www_folder, 'lcfavicon.ico')
+
+        largest_size = 48
+
+        png_filename = 'ico_{0}.png'.format(largest_size)
+        destination_filepath = os.path.join(app_www_folder, png_filename)
+
+        create_png_from_svg(launcher_source, largest_size, largest_size, destination_filepath)
+
+        icon = Image.open(destination_filepath)
+
+        icon.save(ico_target_path, format='ICO')
+
+
+

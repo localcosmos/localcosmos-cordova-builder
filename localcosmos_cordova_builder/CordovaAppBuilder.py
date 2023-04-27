@@ -9,11 +9,11 @@ WORKDIR = os.getenv('LOCALCOSMOS_CORDOVA_BUILDER_WORKDIR', None)
 if not WORKDIR:
     raise ValueError('LOCALCOSMOS_CORDOVA_BUILDER_WORKDIR environment variable not found')
 
-CORDOVA_CLI_VERSION = '11.0.0'
+CORDOVA_CLI_VERSION = '11.1.0'
 
 DEFAULT_CORDOVA_PLATFORM_VERSIONS = {
     "android" : "android@11.0.0",
-    "ios" : "ios@6.2.0",
+    "ios" : "ios@6.3.0",
     "browser" : "browser@6.0.0",
 }
 
@@ -29,7 +29,7 @@ import subprocess, os, shutil, zipfile, json
 from subprocess import CalledProcessError, PIPE
 
 
-from .AppImageCreator import AndroidAppImageCreator, IOSAppImageCreator
+from .AppImageCreator import AndroidAppImageCreator, IOSAppImageCreator, BrowserAppImageCreator
 
 from lxml import etree
 
@@ -107,6 +107,11 @@ class CordovaAppBuilder:
     def _app_build_sources_www_path(self):
         return os.path.join(self._app_build_sources_path, 'www')
 
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/www
+    @property
+    def _app_build_sources_cordova_assets_path(self):
+        return os.path.join(self._app_build_sources_path, 'cordova')
+
     # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/cordova/{package_name}/
     @property
     def _app_cordova_path(self):
@@ -117,13 +122,25 @@ class CordovaAppBuilder:
     def _cordova_www_path(self):
         return os.path.join(self._app_cordova_path, 'www')
 
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/cordova/{package_name}/config.xml
     @property
     def config_xml_path(self):
         return os.path.join(self._app_cordova_path, 'config.xml')
 
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/cordova/config.xml
     @property
     def _custom_config_xml_path(self):
-        return os.path.join(self._app_build_sources_path, 'config.xml')
+        return os.path.join(self._app_build_sources_cordova_assets_path, 'config.xml')
+
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/cordova/res
+    @property
+    def _app_cordova_res_source_folder_path(self):
+        return os.path.join(self._app_build_sources_cordova_assets_path, 'res')
+
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/cordova/{package_name}/res/
+    @property
+    def _cordova_res_folder_path(self):
+        return os.path.join(self._app_cordova_path, 'res')
 
     # installing the cordova CLI
     def load_cordova(self):
@@ -267,7 +284,7 @@ class CordovaAppBuilder:
         # <preference name="StatusBarBackgroundColor" value="#000000" />
 
         preferences = [
-            {'name' : 'SplashMaintainAspectRatio', 'value' : 'true'},
+            #{'name' : 'SplashMaintainAspectRatio', 'value' : 'true'},
             {'name' : 'StatusBarStyle', 'value' : 'blackopaque'},
             {'name' : 'StatusBarOverlaysWebView', 'value' : 'false'},
             {'name' : 'StatusBarBackgroundColor', 'value' : '#000000'},
@@ -362,6 +379,19 @@ class CordovaAppBuilder:
             config_xml_tree.write(config_file, encoding='utf-8', xml_declaration=True, pretty_print=True)
 
 
+    def _copy_cordova_res_folder(self):
+
+        if os.path.isdir(self._app_cordova_res_source_folder_path):
+
+            if not os.path.isdir(self._cordova_res_folder_path):
+                self.logger.info('Copying res folder: {0} to {1}'.format(self._app_cordova_res_source_folder_path, self._cordova_res_folder_path))
+                shutil.copytree(self._app_cordova_res_source_folder_path, self._cordova_res_folder_path)
+            else:
+                self.logger.info('res folder already present, not copying res folder.')
+        else:
+            self.logger.info('No res folder found, not copying res folder.')
+
+
     ##############################################################################################################
     # BUILD CONFIG
     ##############################################################################################################
@@ -387,6 +417,8 @@ class CordovaAppBuilder:
 
         self._update_config_xml()
 
+        self._copy_cordova_res_folder()
+
         self._install_cordova_plugins()
 
         # set app version
@@ -408,7 +440,7 @@ class CordovaAppBuilder:
         self._add_cordova_www_folder()
 
         # build android images
-        self.logger.info('building Android launcher and splashscreen images')
+        self.logger.info('building Android launcher images')
         image_creator = AndroidAppImageCreator(self.meta_app_definition, self._app_cordova_path,
                                                 self._app_build_sources_path)
         
@@ -675,6 +707,8 @@ class CordovaAppBuilder:
 
         self._update_config_xml()
 
+        self._copy_cordova_res_folder()
+
         self._install_cordova_plugins()
 
         # set app version
@@ -692,6 +726,13 @@ class CordovaAppBuilder:
 
         # replace cordova default www with android www
         self._add_cordova_www_folder()
+
+        # add ico
+        self.logger.info('Creating favicon')
+        image_creator = BrowserAppImageCreator(self.meta_app_definition, self._app_cordova_path,
+                                                self._app_build_sources_path)
+
+        image_creator.create_favicon()
 
         # build ios release
         self.logger.info('initiating cordova build browser')

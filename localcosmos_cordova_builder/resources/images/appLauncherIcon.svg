@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="288"
+   height="288"
+   viewBox="0 0 76.199998 76.2"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   sodipodi:docname="splashscreen.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="true"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="1"
+     inkscape:cx="-391"
+     inkscape:cy="127"
+     inkscape:window-width="2560"
+     inkscape:window-height="1371"
+     inkscape:window-x="0"
+     inkscape:window-y="32"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs2" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       id="rect234"
+       style="fill:#ffffff;stroke-linecap:round;stroke-linejoin:round"
+       d="M 2e-6,1.9125e-6 H 76.199998 V 76.199998 H 2e-6 Z" />
+    <g
+       id="g296"
+       transform="matrix(1.3020833,0,0,1.3020833,-11.509372,-11.509399)">
+      <path
+         inkscape:export-ydpi="63"
+         inkscape:export-xdpi="63"
+         inkscape:export-filename="/home/tom/localcosmos_preview/localcosmos/lcsite/static/images/logowhite50.png"
+         style="display:inline;fill:#e06a6a;fill-opacity:1;stroke:none;stroke-width:1.2202;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         d="m 50.645667,30.822537 c 0.05726,8.762724 -8.762877,19.45114 -12.602759,24.919046 -3.714477,-5.539867 -12.51158,-16.251681 -12.602729,-24.919046 0,-6.960273 5.642425,-12.602699 12.602729,-12.602699 6.960303,0 12.602759,5.642426 12.602759,12.602699 z"
+         id="path4902-9-3-3-3"
+         inkscape:connector-curvature="0"
+         sodipodi:nodetypes="cccsc" />
+      <circle
+         inkscape:export-ydpi="63"
+         inkscape:export-xdpi="63"
+         inkscape:export-filename="/home/tom/localcosmos_preview/localcosmos/lcsite/static/images/logowhite50.png"
+         style="display:inline;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.30505"
+         id="path4904-0-2-5-5"
+         cx="38.060814"
+         cy="30.911997"
+         r="5.1198597" />
+      <path
+         inkscape:export-ydpi="63"
+         inkscape:export-xdpi="63"
+         inkscape:export-filename="/home/tom/localcosmos_preview/localcosmos/lcsite/static/images/logowhite50.png"
+         style="display:inline;fill:#6fdc59;fill-opacity:1;stroke:none;stroke-width:0.949106;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         d="m 60.278853,55.260854 c -3.115754,1.840094 -6.631856,2.78871 -17.960024,2.702685 4.461209,-8.235536 8.180506,-12.145702 11.296259,-13.985858 3.115785,-1.840155 7.133329,-0.806065 8.973454,2.30972 1.840125,3.115723 0.806065,7.133267 -2.309689,8.973453 z"
+         id="path4914-2-3-6-6"
+         inkscape:connector-curvature="0"
+         sodipodi:nodetypes="scsss" />
+      <path
+         inkscape:export-ydpi="63"
+         inkscape:export-xdpi="63"
+         inkscape:export-filename="/home/tom/localcosmos_preview/localcosmos/lcsite/static/images/logowhite50.png"
+         style="display:inline;fill:#6fdc59;fill-opacity:1;stroke:none;stroke-width:0.949106;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+         d="m 15.921173,55.27208 c 3.115754,1.840125 6.631795,2.78877 17.959994,2.702746 -4.46121,-8.235597 -8.180506,-12.145733 -11.29626,-13.985858 -3.115784,-1.840124 -7.133298,-0.806034 -8.973453,2.309689 -1.840125,3.115724 -0.806065,7.133268 2.309719,8.973423 z"
+         id="path4916-3-1-2-2"
+         inkscape:connector-curvature="0"
+         sodipodi:nodetypes="scsss" />
+    </g>
+  </g>
+</svg>
