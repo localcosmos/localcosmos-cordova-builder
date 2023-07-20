@@ -284,7 +284,7 @@ class CordovaAppBuilder:
         # <preference name="StatusBarBackgroundColor" value="#000000" />
 
         preferences = [
-            #{'name' : 'SplashMaintainAspectRatio', 'value' : 'true'},
+            {'name' : 'SplashMaintainAspectRatio', 'value' : 'true'},
             {'name' : 'StatusBarStyle', 'value' : 'blackopaque'},
             {'name' : 'StatusBarOverlaysWebView', 'value' : 'false'},
             {'name' : 'StatusBarBackgroundColor', 'value' : '#000000'},
@@ -629,6 +629,9 @@ class CordovaAppBuilder:
         
         # NSLocationAlwaysUsageDescription
         self.set_ios_info_plist_value('NSLocationAlwaysUsageDescription',
+                                      'location access is required for observations and maps')
+
+        self.set_ios_info_plist_value('NSLocationAlwaysAndWhenInUseUsageDescription',
                                       'location access is required for observations and maps')
 
         # enable wkwebview

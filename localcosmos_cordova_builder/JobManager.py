@@ -153,6 +153,8 @@ class JobManager:
 
             # results contain only unassigned jobs
             for job in response['results']:
+                
+                self.logger.info(json.dumps(job))
 
                 # meta_app_uuid and job_type
                 results = AppKitJob.select().where(AppKitJob.meta_app_uuid==job['meta_app_uuid'],
