@@ -18,3 +18,4 @@ localcosmos_cordova_builder.egg-info/requires.txt
 localcosmos_cordova_builder.egg-info/top_level.txt
 localcosmos_cordova_builder/resources/images/adaptive_launcher_background.png
 localcosmos_cordova_builder/resources/images/adaptive_launcher_background.svg
+localcosmos_cordova_builder/resources/images/appLauncherIcon.svg
