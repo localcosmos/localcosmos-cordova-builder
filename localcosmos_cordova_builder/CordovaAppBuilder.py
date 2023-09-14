@@ -9,7 +9,7 @@ WORKDIR = os.getenv('LOCALCOSMOS_CORDOVA_BUILDER_WORKDIR', None)
 if not WORKDIR:
     raise ValueError('LOCALCOSMOS_CORDOVA_BUILDER_WORKDIR environment variable not found')
 
-CORDOVA_CLI_VERSION = '11.1.0'
+CORDOVA_CLI_VERSION = '12.0.0'
 
 DEFAULT_CORDOVA_PLATFORM_VERSIONS = {
     "android" : "android@12.0.1",
