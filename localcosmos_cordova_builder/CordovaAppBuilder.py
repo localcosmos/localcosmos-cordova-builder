@@ -503,7 +503,7 @@ class CordovaAppBuilder:
 
     @property
     def _ipa_folder(self):
-        return os.path.join(self._app_cordova_path, 'platforms/ios/build/device/')
+        return os.path.join(self._app_cordova_path, 'platforms/ios/build/Release-iphoneos/')
 
     @property
     def _ipa_filepath(self):
