@@ -13,7 +13,7 @@ CORDOVA_CLI_VERSION = '12.0.0'
 
 DEFAULT_CORDOVA_PLATFORM_VERSIONS = {
     "android" : "android@12.0.1",
-    "ios" : "ios@7.0.1",
+    "ios" : "ios@7.1.0",
     "browser" : "browser@7.0.0",
 }
 

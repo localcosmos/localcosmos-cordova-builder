@@ -44,10 +44,14 @@ def create_png_from_svg(svg_filepath, width, height, destination_filepath):
   
     installed_inkscape_version = 0
     try:
-        installed_inkscape_version = float(str(version_process.stdout).split(' ')[1])
+        installed_inkscape_version_str = str(version_process.stdout).split(' ')[1]
+        version_parts = installed_inkscape_version_str.split('.')
+        major_version = version_parts[0]
+        subversion = version_parts[1]
+        installed_inkscape_version = float('{0}.{1}'.format(major_version, subversion))
     except:
         pass
-    
+
     if installed_inkscape_version >= 1.2:
 
         command = ["inkscape", "--export-filename={0}".format(destination_filepath),
