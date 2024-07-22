@@ -16,6 +16,8 @@ localcosmos_cordova_builder.egg-info/SOURCES.txt
 localcosmos_cordova_builder.egg-info/dependency_links.txt
 localcosmos_cordova_builder.egg-info/requires.txt
 localcosmos_cordova_builder.egg-info/top_level.txt
+localcosmos_cordova_builder/resources/__init__.py
+localcosmos_cordova_builder/resources/images/__init__.py
 localcosmos_cordova_builder/resources/images/adaptive_launcher_background.png
 localcosmos_cordova_builder/resources/images/adaptive_launcher_background.svg
 localcosmos_cordova_builder/resources/images/appLauncherIcon.svg

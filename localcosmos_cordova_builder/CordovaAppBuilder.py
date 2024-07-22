@@ -12,7 +12,7 @@ if not WORKDIR:
 CORDOVA_CLI_VERSION = '12.0.0'
 
 DEFAULT_CORDOVA_PLATFORM_VERSIONS = {
-    "android" : "android@12.0.1",
+    "android" : "android@13.0.0",
     "ios" : "ios@7.1.0",
     "browser" : "browser@7.0.0",
 }
