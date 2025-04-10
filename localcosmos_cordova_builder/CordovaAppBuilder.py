@@ -17,6 +17,8 @@ DEFAULT_CORDOVA_PLATFORM_VERSIONS = {
     "browser" : "browser@7.0.0",
 }
 
+REQUIRED_PLUGINS = ['cordova-plugin-assetpack']
+
 PLATFORM_IOS = 'ios'
 PLATFORM_ANDROID = 'android'
 PLATFORM_BROWSER = 'browser'
@@ -26,7 +28,7 @@ class CordovaBuildError(Exception):
 
 
 import subprocess, os, shutil, zipfile, json
-from subprocess import CalledProcessError, PIPE
+from subprocess import PIPE
 
 
 from .AppImageCreator import AndroidAppImageCreator, IOSAppImageCreator, BrowserAppImageCreator
@@ -51,9 +53,6 @@ class CordovaAppBuilder:
     # cordova creates aabs in these folders
     unsigned_release_aab_output_path = 'platforms/android/app/build/outputs/bundle/release/app-release-unsigned.aab'
     signed_release_aab_output_path = 'platforms/android/app/build/outputs/bundle/release/app-release.aab'
-
-    debug_apk_output_path = 'platforms/android/app/build/outputs/apk/debug/app-debug.apk'
-
 
     def __init__(self, meta_app_definition, _cordova_build_path, _app_build_sources_path):
 
@@ -194,6 +193,8 @@ class CordovaAppBuilder:
         frontend_settings = self.meta_app_definition.frontend
         cordova_settings = frontend_settings.get('cordova', {})
         plugins = cordova_settings.get('plugins', [])
+        
+        plugins = plugins + REQUIRED_PLUGINS
 
         return plugins
 
@@ -293,6 +294,13 @@ class CordovaAppBuilder:
 
         for tag_attributes in preferences:
             self._add_to_config_xml('preference', tag_attributes=tag_attributes)
+            
+        # enable asset pack delivery for android
+        # inside <platform name="android"> add:
+        # <preference name="AssetPackSourcePath" value="localcosmos/user_content/content_images" />
+        self._add_to_config_xml('preference', tag_attributes={'name' : 'AssetPackSourcePath',
+                                                             'value' : 'localcosmos/user_content/content_images'},
+                                parent_node_name='platform', parent_node_attributes={'name' : 'android'})
         
     
     #####################################################################################################
@@ -314,49 +322,51 @@ class CordovaAppBuilder:
 
     #####################################################################################################
     # CONFIG XML
-    # - currently, only adding to <widget> is supported
-    def _add_to_config_xml(self, tag_name, tag_attributes={}):
+    # 
+    def _add_to_config_xml(self, tag_name, tag_attributes={}, parent_node_name=None, parent_node_attributes={}):
+        """
+        Add a tag to the config.xml file. Supports adding to the root or a specific parent node.
 
+        :param tag_name: Name of the tag to add.
+        :param tag_attributes: Attributes of the tag to add.
+        :param parent_node_name: Name of the parent node to add the tag under (optional).
+        :param parent_node_attributes: Attributes of the parent node (optional, used if parent node needs to be created).
+        """
         with open(self.config_xml_path, 'rb') as config_file:
             config_xml_tree = etree.parse(config_file)
 
-        # root is the widget tag
+        # Get the root element (widget tag)
         root = config_xml_tree.getroot()
 
-        exists = False
-
-
-        # check all edit-configs
-        for child in root:
-
-            # tag without namespace
-            existing_tag_name = etree.QName(child.tag).localname
-            
-            if tag_name == existing_tag_name:
-
-                attributes = child.attrib
-
-                all_attributes_match = True
-                
-                for attrib_key, attrib_value in tag_attributes.items():
-
-                    existing_value = attributes.get(attrib_key)
-                    
-                    if existing_value != attrib_value:
-                        all_attributes_match = False
+        # Determine the parent node
+        parent_node = root
+        if parent_node_name:
+            # Search for the parent node
+            for child in root:
+                if etree.QName(child.tag).localname == parent_node_name:
+                    # Check if all specified attributes match
+                    if all(child.attrib.get(k) == v for k, v in parent_node_attributes.items()):
+                        parent_node = child
                         break
+            else:
+                # If the parent node does not exist, create it
+                parent_node = etree.Element(parent_node_name, attrib=parent_node_attributes)
+                root.append(parent_node)
 
-                if all_attributes_match == True:
+        # Check if the tag already exists under the parent node
+        exists = False
+        for child in parent_node:
+            if etree.QName(child.tag).localname == tag_name:
+                if all(child.attrib.get(k) == v for k, v in tag_attributes.items()):
                     exists = True
+                    break
 
-
-        # check if element exists
-        if exists == False:
-
+        # Add the tag if it does not exist
+        if not exists:
             new_element = etree.Element(tag_name, attrib=tag_attributes)
-            root.append(new_element)
+            parent_node.append(new_element)
 
-            # xml_declaration: <?xml version='1.0' encoding='utf-8'?>
+            # Write the updated XML back to the file
             with open(self.config_xml_path, 'wb') as config_file:
                 config_xml_tree.write(config_file, encoding='utf-8', xml_declaration=True, pretty_print=True)
 
@@ -407,6 +417,7 @@ class CordovaAppBuilder:
     # - copy www
     # - run cordova build command
     ##############################################################################################################
+    
     def build_android(self, keystore_path, keystore_password, key_password, rebuild=False):
 
         self.logger.info('Building cordova android app')
@@ -438,7 +449,6 @@ class CordovaAppBuilder:
         
         # replace cordova default www with android www
         self._add_cordova_www_folder()
-
         # build android images
         self.logger.info('building Android launcher images')
         image_creator = AndroidAppImageCreator(self.meta_app_definition, self._app_cordova_path,
@@ -447,7 +457,6 @@ class CordovaAppBuilder:
         for image_type, image_filename in REQUIRED_ASSETS.items():
             image_creator.generate_images_from_svg(image_type)
         
-
         self.logger.info('initiating cordova build android for release aab')
         build_android_command = [self.cordova_bin, 'build', 'android', '--release', '--',
                                  '--keystore={0}'.format(keystore_path),
@@ -459,33 +468,14 @@ class CordovaAppBuilder:
 
         if build_android_process_completed.returncode != 0:
             raise CordovaBuildError(build_android_process_completed.stderr)
-
-        # build debug apk
-        self.logger.info('initiating cordova build android for debug apk')
-        build_android_apk_command = [self.cordova_bin, 'build', 'android', '--',
-                                 '--keystore={0}'.format(keystore_path),
-                                 '--storePassword={0}'.format(keystore_password),
-                                 '--alias=localcosmos', '--password={0}'.format(key_password)]
-
-        build_android_apk_process_completed = subprocess.run(build_android_apk_command, stdout=PIPE, stderr=PIPE,
-                                                         cwd=self._app_cordova_path)
-
-        if build_android_apk_process_completed.returncode != 0:
-            raise CordovaBuildError(build_android_apk_process_completed.stderr)
-
-        return self._aab_filepath, self._apk_filepath
+        
+        return self._aab_filepath
 
 
     @property
     def _aab_filepath(self):
         # uses the default .aab filename created by cordova
         return os.path.join(self._app_cordova_path, self.signed_release_aab_output_path)
-
-    @property
-    def _apk_filepath(self):
-        # uses the default .apk filename created by cordova
-        return os.path.join(self._app_cordova_path, self.debug_apk_output_path)
-
 
     ##############################################################################################################
     # BUILD iOS .ipa
@@ -697,7 +687,6 @@ class CordovaAppBuilder:
     # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/cordova/{meta_app_definition.package_name}/platforms/browser/www
     @property
     def _browser_built_www_path(self):
-        # uses the default .apk filename created by cordova
         return os.path.join(self._app_cordova_path, 'platforms/browser/www')
 
     def build_browser(self, rebuild=False, build_zip=False):
