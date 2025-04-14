@@ -68,18 +68,18 @@ class CordovaAppBuilder:
         self._app_build_sources_path = _app_build_sources_path
         
         # currently settings are only used for the smtp logger
-        smtp_logger = {}
+        smtp_settings = {}
         settings_filepath = os.path.join(WORKDIR, 'app_builder_settings.json')
         
         if os.path.isfile(settings_filepath):
             with open(settings_filepath, 'r') as settings_file:
                 cab_settings = json.loads(settings_file.read())
-                smtp_logger = cab_settings['email']
+                smtp_settings = cab_settings['email']
             
-        self.logger = self._get_logger(smtp_logger=smtp_logger)
+        self.logger = self._get_logger(smtp_settings=smtp_settings)
 
 
-    def _get_logger(self, smtp_logger={}):
+    def _get_logger(self, smtp_settings={}):
 
         if hasattr(self, 'logger'):
             return self.logger
@@ -89,7 +89,7 @@ class CordovaAppBuilder:
         logging_folder = os.path.join(WORKDIR, 'log/cordova_app_builder/')
         logfile_name = self.meta_app_definition.uuid
 
-        self.logger = get_logger(logger_name, logging_folder, logfile_name, smtp_logger=smtp_logger)
+        self.logger = get_logger(logger_name, logging_folder, logfile_name, smtp_settings=smtp_settings)
 
         return self.logger
 

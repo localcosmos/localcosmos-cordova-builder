@@ -113,8 +113,8 @@ class JobManager:
         # for cross platform logging use a logfolder within the folder in which JobManager.py lies
         logging_folder = os.path.join(WORKDIR, 'log/job_manager/')
 
-        smtp_logger = self.settings['email']
-        logger = get_logger(__name__, logging_folder, 'log', smtp_logger=smtp_logger)
+        smtp_settings = self.settings['email']
+        logger = get_logger(__name__, logging_folder, 'log', smtp_settings=smtp_settings)
 
         return logger
 
