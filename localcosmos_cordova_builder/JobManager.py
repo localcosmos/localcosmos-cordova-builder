@@ -139,7 +139,7 @@ class JobManager:
 
         db.connect()
 
-        self.logger.info('updating job list')
+        #self.logger.info('updating job list')
 
         data = {
             'platform' : self.settings['platform'],
@@ -200,7 +200,7 @@ class JobManager:
 
     def run_jobs(self, rerun_unsuccessful=False, from_scratch=False):
     
-        self.logger.info('running jobs')
+        #self.logger.info('running jobs')
 
         db.connect()
 
@@ -210,8 +210,8 @@ class JobManager:
         else:
             unfinished_jobs = AppKitJob.select().where(AppKitJob.finished_at==None)
         
-        if not unfinished_jobs:
-            self.logger.info('no unfinished jobs found. maybe try --rerun-successful.')
+        #if not unfinished_jobs:
+        #    self.logger.info('no unfinished jobs found. maybe try --rerun-successful.')
         
         for job in unfinished_jobs:
 
@@ -252,7 +252,8 @@ class JobManager:
 
         db.close()
 
-        self.logger.info('finished running all jobs (if any).')
+        if unfinished_jobs:
+            self.logger.info('finished running all jobs.')
     
     
     def run_build_job(self, job, from_scratch=False):
@@ -441,7 +442,7 @@ class LCAppkitApiRequest:
     def validate_token(self, token):
     
         logger = self._get_logger()
-        logger.info('validating token')
+        #logger.info('validating token')
 
         token_str = 'Bearer {0}'.format(token)
 
@@ -453,11 +454,11 @@ class LCAppkitApiRequest:
         try:
             response = request.urlopen(api_request)
             response_data = json.loads(response.read())
-            logger.info('token is valid.')
+            #logger.info('token is valid.')
             return token
 
         except:
-            logger.info('token is not valid.')
+            logger.error('token is not valid.')
             return None
     
 

@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
     logger = get_logger(logger_name, logging_folder, 'log')
     
-    logger.info('executed run_jobs.py')
+    #logger.info('executed run_jobs.py')
 
     force_run = False
     rerun_unsuccessful = False
@@ -103,8 +103,6 @@ if __name__ == "__main__":
             
         
         if run == True or force_run == True:
-        
-            logger.info('instantiating JobManager')
 
             job_manager = JobManager()
 
@@ -116,17 +114,19 @@ if __name__ == "__main__":
 
                 error_log['error_count'] = 0
                 error_log['last_tried_at'] = datetime.now().timestamp()
-                
+                error_log['last_tried_at_human'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Add human-readable timestamp
+
             except Exception as e:
                 job_manager.logger.error(e, exc_info=True)
                 error_log['error_count'] = error_log['error_count'] + 1
                 error_log['last_tried_at'] = datetime.now().timestamp()
+                error_log['last_tried_at_human'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Add human-readable timestamp
 
                 if error_log['error_count'] == 10:
                     job_manager.logger.error('too many errors. gave up trying. waiting for repair')
 
             with open(error_count_path, 'w') as logfile:
-                logfile.write(json.dumps(error_log))
+                logfile.write(json.dumps(error_log, indent=4))  # Use indent=4 for better readability
 
         else:
             print('Not running JobManager')
