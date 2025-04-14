@@ -28,6 +28,7 @@ long_options = ['force-run','rerun-unsuccessful', 'from-scratch']
 
 
 if __name__ == "__main__":
+    me = SingleInstance()
 
     logger_name = 'run_jobs'
     logging_folder = os.path.join(WORKDIR, 'log/run_jobs/')
@@ -35,8 +36,6 @@ if __name__ == "__main__":
     logger = get_logger(logger_name, logging_folder, 'log')
     
     logger.info('executed run_jobs.py')
-
-    me = SingleInstance()
 
     force_run = False
     rerun_unsuccessful = False

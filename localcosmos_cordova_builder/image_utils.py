@@ -119,7 +119,7 @@ def create_resized_png_from_svg(svg_filepath, width, height, destination_filepat
     # cut the png
     size = (width, height)
     image_file = Image.open(destination_filepath)
-    image_file_cropped = ImageOps.fit(image_file, size, Image.ANTIALIAS, bleed=0, centering=(0.5, 0.5))
+    image_file_cropped = ImageOps.fit(image_file, size, Image.LANCZOS, bleed=0, centering=(0.5, 0.5))
     image_file_cropped.save(destination_filepath, 'PNG')
     
     
