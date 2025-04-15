@@ -123,14 +123,31 @@ def create_resized_png_from_svg(svg_filepath, width, height, destination_filepat
     image_file_cropped.save(destination_filepath, 'PNG')
     
     
-
-    
 def remove_alpha_channel_from_png(png_filepath):
-    # convert image.png -background white -alpha remove -alpha off white.png
-    command = ['convert', png_filepath, '-background', 'white', '-alpha', 'remove', '-alpha', 'off', png_filepath]
-    
+    """
+    Removes the alpha channel from a PNG file by replacing it with a white background.
+    Supports both 'convert' (older ImageMagick) and 'magick' (newer ImageMagick versions).
+    """
+    # Determine which command to use: 'convert' or 'magick'
+    command_base = None
+    try:
+        # Check if 'magick' is available
+        subprocess.run(['magick', '-version'], stdout=PIPE, stderr=PIPE, check=True)
+        command_base = ['magick', 'convert']
+    except FileNotFoundError:
+        try:
+            # Check if 'convert' is available
+            subprocess.run(['convert', '-version'], stdout=PIPE, stderr=PIPE, check=True)
+            command_base = ['convert']
+        except FileNotFoundError:
+            raise ImageMagickError("Neither 'magick' nor 'convert' command is available. Please install ImageMagick.")
+
+    # Build the command
+    command = command_base + [png_filepath, '-background', 'white', '-alpha', 'remove', '-alpha', 'off', png_filepath]
+
+    # Run the command
     process_completed = subprocess.run(command, stdout=PIPE, stderr=PIPE)
 
     if process_completed.returncode != 0:
-        raise ImageMagickError(process_completed.stderr)
-    
+        raise ImageMagickError(process_completed.stderr.decode('utf-8'))
+
