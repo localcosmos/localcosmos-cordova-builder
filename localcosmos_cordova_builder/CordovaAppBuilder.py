@@ -11,6 +11,9 @@ if not WORKDIR:
 
 CORDOVA_CLI_VERSION = '12.0.0'
 
+ANDROID_BUNDLETOOL_FILENAME = 'bundletool-all-1.18.1.jar'
+ANDROID_BUNDLETOOL_LINK = os.path.join('https://github.com/google/bundletool/releases/download/1.18.1/', ANDROID_BUNDLETOOL_FILENAME)
+
 DEFAULT_CORDOVA_PLATFORM_VERSIONS = {
     "android" : "android@13.0.0",
     "ios" : "ios@7.1.0",
@@ -53,6 +56,10 @@ class CordovaAppBuilder:
     # cordova creates aabs in these folders
     unsigned_release_aab_output_path = 'platforms/android/app/build/outputs/bundle/release/app-release-unsigned.aab'
     signed_release_aab_output_path = 'platforms/android/app/build/outputs/bundle/release/app-release.aab'
+    
+    signed_apk_output_folder = 'platforms/android/app/build/outputs/apk/release/'
+    apks_filename = 'app-release.apks'
+    signed_apk_output_filename = 'app-release.apk'
 
     def __init__(self, meta_app_definition, _cordova_build_path, _app_build_sources_path):
 
@@ -140,6 +147,10 @@ class CordovaAppBuilder:
     @property
     def _cordova_res_folder_path(self):
         return os.path.join(self._app_cordova_path, 'res')
+    
+    @property
+    def _android_bundletool_folder_path(self):
+        return os.path.join(WORKDIR, 'android_bundletool')
 
     # installing the cordova CLI
     def load_cordova(self):
@@ -476,6 +487,106 @@ class CordovaAppBuilder:
     def _aab_filepath(self):
         # uses the default .aab filename created by cordova
         return os.path.join(self._app_cordova_path, self.signed_release_aab_output_path)
+    
+    ##############################################################################################################
+    # BUILD ANDROID .apk
+    # uses bundletool to create an apk from the aab
+    def build_android_apk(self, aab_path, keystore_path, keystore_password, key_password):
+        if not os.path.isfile(aab_path):
+            raise CordovaBuildError('AAB file not found: {0}'.format(aab_path))
+
+        self.logger.info('Building cordova android apk from aab')
+
+        if not os.path.isdir(self._apk_folder):
+            self.logger.info('Creating apk folder: {0}'.format(self._apk_folder))
+            os.makedirs(self._apk_folder)
+
+        self.download_bundletool()
+        self.logger.info('Using bundletool to create apk from aab')
+
+        # Generate APKs from AAB using BundleTool
+        bundletool_command = [
+            'java', '-jar', self._bundletool_jar_path,
+            'build-apks',
+            '--bundle', aab_path,
+            '--output', self._apks_filepath,
+            '--ks', keystore_path,
+            '--ks-pass', 'pass:{0}'.format(keystore_password),
+            '--ks-key-alias', 'localcosmos',
+            '--key-pass', 'pass:{0}'.format(key_password),
+            '--mode', 'universal'
+        ]
+
+        process_completed = subprocess.run(bundletool_command, stdout=PIPE, stderr=PIPE)
+
+        if process_completed.returncode != 0:
+            raise CordovaBuildError('Failed to create APK from AAB: {0}'.format(process_completed.stderr.decode('utf-8')))
+
+        # Verify the contents of the .apks file
+        self.logger.info('Verifying contents of the .apks file')
+        list_command = ['unzip', '-l', self._apks_filepath]
+        list_process_completed = subprocess.run(list_command, stdout=PIPE, stderr=PIPE)
+
+        if list_process_completed.returncode != 0:
+            raise CordovaBuildError('Failed to list contents of .apks file: {0}'.format(list_process_completed.stderr.decode('utf-8')))
+
+        # Check if universal.apk exists in the .apks file
+        if b'universal.apk' in list_process_completed.stdout:
+            apk_to_extract = 'universal.apk'
+        else:
+            raise CordovaBuildError('universal.apk not found in .apks file. Ensure the .apks file was generated with --mode universal.')
+
+        # Extract the universal APK from the .apks file
+        extract_command = [
+            'unzip', '-o', self._apks_filepath, apk_to_extract, '-d', self._apk_folder
+        ]
+
+        extract_process_completed = subprocess.run(extract_command, stdout=PIPE, stderr=PIPE)
+
+        if extract_process_completed.returncode != 0:
+            raise CordovaBuildError('Failed to extract APK from .apks file: {0}'.format(extract_process_completed.stderr.decode('utf-8')))
+
+        # Rename the extracted APK to the desired output filename
+        extracted_apk_path = os.path.join(self._apk_folder, apk_to_extract)
+        if os.path.isfile(extracted_apk_path):
+            os.rename(extracted_apk_path, self._apk_filepath)
+            self.logger.info('APK successfully created: {0}'.format(self._apk_filepath))
+        else:
+            raise CordovaBuildError('Extracted APK not found: {0}'.format(extracted_apk_path))
+
+        return self._apk_filepath
+    
+    
+    def download_bundletool(self):
+        
+        if not os.path.isfile(self._bundletool_jar_path):
+            self.logger.info('Downloading bundletool.jar')
+            
+            if not os.path.isdir(self._android_bundletool_folder_path):
+                os.makedirs(self._android_bundletool_folder_path)
+                
+            bundletool_command = ['wget', ANDROID_BUNDLETOOL_LINK, '-O', self._bundletool_jar_path]
+            bundletool_process_completed = subprocess.run(bundletool_command, stdout=PIPE, stderr=PIPE,
+                                                           cwd=self._android_bundletool_folder_path)
+            if bundletool_process_completed.returncode != 0:
+                raise CordovaBuildError('Could not download bundletool: {0}'.format(bundletool_process_completed.stderr))
+    
+    @property
+    def _bundletool_jar_path(self):
+        return os.path.join(self._android_bundletool_folder_path, ANDROID_BUNDLETOOL_FILENAME)
+    
+    @property
+    def _apk_folder(self):
+        return os.path.join(self._app_cordova_path, self.signed_apk_output_folder)
+    
+    @property
+    def _apk_filepath(self):
+        return os.path.join(self._apk_folder, self.signed_apk_output_filename)
+    
+    @property
+    def _apks_filepath(self):
+        return os.path.join(self._apk_folder, self.apks_filename)
+        
 
     ##############################################################################################################
     # BUILD iOS .ipa
