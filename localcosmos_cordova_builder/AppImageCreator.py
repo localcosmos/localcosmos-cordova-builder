@@ -198,9 +198,10 @@ class IOSAppImageCreator(AppImageCreator):
     }
 
     def get_folder(self, image_type):
-        folder = 'platforms/ios/{0}/Assets.xcassets/{1}'.format(self.meta_app_definition.name,
-                                                                self.definitions[image_type]['folder'])
+        #folder = 'platforms/ios/{0}/Assets.xcassets/{1}'.format(self.meta_app_definition.name,
+        #                                                        self.definitions[image_type]['folder'])
 
+        folder = 'platforms/ios/App/Assets.xcassets/{0}'.format(self.definitions[image_type]['folder'])
         return folder
 
 
