@@ -15,9 +15,9 @@ ANDROID_BUNDLETOOL_FILENAME = 'bundletool-all-1.18.1.jar'
 ANDROID_BUNDLETOOL_LINK = os.path.join('https://github.com/google/bundletool/releases/download/1.18.1/', ANDROID_BUNDLETOOL_FILENAME)
 
 DEFAULT_CORDOVA_PLATFORM_VERSIONS = {
-    "android" : "android@13.0.0",
-    "ios" : "ios@7.1.0",
-    "browser" : "browser@7.0.0",
+    "android" : "android@14.0.1",
+    "ios" : "ios@8.0.0",
+    "browser" : "browser@7.1.1",
 }
 
 REQUIRED_PLUGINS = ['cordova-plugin-assetpack']
@@ -147,7 +147,17 @@ class CordovaAppBuilder:
     @property
     def _cordova_res_folder_path(self):
         return os.path.join(self._app_cordova_path, 'res')
-    
+
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/sources/cordova/resource_files
+    @property
+    def _app_build_sources_resource_files_path(self):
+        return os.path.join(self._app_build_sources_cordova_assets_path, 'resource_files')
+
+    # {settings.APP_KIT_ROOT}/{meta_app.uuid}/{meta_app.current_version}/release/cordova/{package_name}/resource_files/
+    @property
+    def _cordova_resource_files_path(self):
+        return os.path.join(self._app_cordova_path, 'resource_files')
+
     @property
     def _android_bundletool_folder_path(self):
         return os.path.join(WORKDIR, 'android_bundletool')
@@ -211,6 +221,8 @@ class CordovaAppBuilder:
 
     
     def _install_cordova_plugins(self):
+        
+        self.logger.info('Installing cordova plugins')
 
         commands = []
 
@@ -219,10 +231,15 @@ class CordovaAppBuilder:
             commands.append([self.cordova_bin, 'plugin', 'add', plugin])
 
         for command in commands:
+            
+            self.logger.info('Running command: {0}'.format(' '.join(command)))
             process_completed = subprocess.run(command, stdout=PIPE, stderr=PIPE, cwd=self._app_cordova_path)
+            self.logger.info('Command finished with return code: {0}'.format(process_completed.returncode))
 
             if process_completed.returncode != 0:
                 raise CordovaBuildError(process_completed.stderr)
+        
+        self.logger.info('Finished installing cordova plugins')
             
 
     # rebuild should be set to False once we are out of development
@@ -413,6 +430,19 @@ class CordovaAppBuilder:
             self.logger.info('No res folder found, not copying res folder.')
 
 
+    def _copy_resource_files_folder(self):
+
+        if os.path.isdir(self._app_build_sources_resource_files_path):
+
+            if not os.path.isdir(self._cordova_resource_files_path):
+                self.logger.info('Copying resource_files folder: {0} to {1}'.format(self._app_build_sources_resource_files_path, self._cordova_resource_files_path))
+                shutil.copytree(self._app_build_sources_resource_files_path, self._cordova_resource_files_path)
+            else:
+                self.logger.info('resource_files folder already present, not copying resource_files folder.')
+        else:
+            self.logger.info('No resource_files folder found, not copying resource_files folder.')
+
+
     ##############################################################################################################
     # BUILD CONFIG
     ##############################################################################################################
@@ -440,6 +470,8 @@ class CordovaAppBuilder:
         self._update_config_xml()
 
         self._copy_cordova_res_folder()
+
+        self._copy_resource_files_folder()
 
         self._install_cordova_plugins()
 
@@ -713,6 +745,8 @@ class CordovaAppBuilder:
 
         self._update_config_xml()
 
+        self._copy_resource_files_folder()
+
         self._install_cordova_plugins()
         
         # set app version
@@ -811,6 +845,8 @@ class CordovaAppBuilder:
         self._update_config_xml()
 
         self._copy_cordova_res_folder()
+
+        self._copy_resource_files_folder()
 
         self._install_cordova_plugins()
 
