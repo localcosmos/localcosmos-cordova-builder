@@ -40,13 +40,14 @@ class MetaAppDefinition:
     @classmethod
     def meta_app_to_dict(cls, meta_app):
 
-        fields = ['uuid', 'name', 'primary_language', 'published_version', 'current_version', 'package_name',
+        fields = ['uuid', 'name', 'primary_language', 'published_version', 'current_version',
                     'build_number', 'build_status', 'validation_status']
 
         meta_app_definition = {
             'uid' : meta_app.app.uid,
             'build_settings' : meta_app.build_settings,
             'frontend' : {},
+            'package_name' : meta_app.get_package_name(),
         }
 
         
